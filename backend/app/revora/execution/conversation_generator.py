@@ -1,17 +1,28 @@
-# backend/app/revora/execution/conversation_generator.py
-
 from app.guardrail.types import FailureCause
 from app.llm import get_llm_provider
+from app.llm.fallback_keywords import fallback_generate_hinglish_message
 
 class ConversationGenerator:
     def __init__(self):
         self.llm_provider = get_llm_provider()
 
-    def generate_nudge(self, customer_name: str, amount_paise: int, payment_link: str, cause: FailureCause) -> str:
+    def generate_nudge(
+        self, 
+        customer_name: str, 
+        amount_paise: int, 
+        payment_link: str, 
+        cause: FailureCause,
+        use_llm: bool = False
+    ) -> str:
         """
-        Converts the amount to Rupees and generates a Hinglish message.
+        Converts the amount to Rupees and generates a friendly Hinglish message.
+        Uses fast deterministic templates for known failure causes, only invoking
+        the LLM provider for genuinely ambiguous/fallback cases to prevent batch latency.
         """
         amount_rupees = amount_paise / 100.0
+        if not use_llm:
+            return fallback_generate_hinglish_message(customer_name, amount_rupees, payment_link, cause)
+
         try:
             return self.llm_provider.generate_hinglish_message(
                 customer_name=customer_name,
@@ -19,9 +30,6 @@ class ConversationGenerator:
                 payment_link=payment_link,
                 cause=cause
             )
-        except Exception as e:
-            # High-reliability fallback formatting
-            return (
-                f"Hi {customer_name}! Aapka ₹{amount_rupees:.2f} ka payment process nahi ho paya due to {cause.replace('_', ' ')}. "
-                f"Use this safe link to complete your payment: {payment_link}. Thank you!"
-            )
+        except Exception:
+            return fallback_generate_hinglish_message(customer_name, amount_rupees, payment_link, cause)
+

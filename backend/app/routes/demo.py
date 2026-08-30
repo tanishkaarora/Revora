@@ -129,17 +129,24 @@ def simulate_recovery_outcome(payment_id: str, action: str, cause: str = "unknow
         return True, 1.0
     return False, 0.0
 
-async def process_batch_background(payments: list, delay_ms: int = 50):
+async def process_batch_background(payments: list, delay_ms: int = 20):
     """
     Simulates batch ingestion, running optimized and baseline paths in parallel,
-    with paced WebSocket broadcasts and explicit stage progression.
+    with continuous per-case WebSocket progress broadcasts driven by actual completed case count.
     """
     results_cache.is_running = True
+    total_cases = len(payments)
     
     # Broadcast Stage 1: Ingesting
     await manager.broadcast({
         "type": "stage_update",
-        "data": {"stage": "Ingesting", "progress": 15, "description": f"Ingesting {len(payments)} payment failure webhook events"}
+        "data": {
+            "stage": "Ingesting", 
+            "progress": 2, 
+            "completed": 0,
+            "total": total_cases,
+            "description": f"Ingesting {total_cases} payment failure webhook events"
+        }
     })
     
     total_revenue_at_risk = sum(p.amount_paise for p in payments)
@@ -163,7 +170,13 @@ async def process_batch_background(payments: list, delay_ms: int = 50):
     # Broadcast Stage 2: Diagnosing
     await manager.broadcast({
         "type": "stage_update",
-        "data": {"stage": "Diagnosing", "progress": 30, "description": "Classifying root failure causes via rule engine and LLM"}
+        "data": {
+            "stage": "Diagnosing", 
+            "progress": 4, 
+            "completed": 0,
+            "total": total_cases,
+            "description": "Classifying root failure causes via rule engine (with LLM fallback)"
+        }
     })
 
     # 2. Pre-diagnose all payments
@@ -189,7 +202,13 @@ async def process_batch_background(payments: list, delay_ms: int = 50):
     # Broadcast Stage 3 & 4: Scoring & Optimizing
     await manager.broadcast({
         "type": "stage_update",
-        "data": {"stage": "Scoring & Optimizing", "progress": 50, "description": "Computing Bayesian recovery probabilities and solving PuLP MILP"}
+        "data": {
+            "stage": "Scoring & Optimizing", 
+            "progress": 6, 
+            "completed": 0,
+            "total": total_cases,
+            "description": "Computing Bayesian recovery probabilities and solving PuLP MILP"
+        }
     })
 
     # 3. Solve optimization (Triage)
@@ -235,13 +254,7 @@ async def process_batch_background(payments: list, delay_ms: int = 50):
     hp_recovered = 0
     hp_costs = 0
 
-    # Broadcast Stage 5: Guardrail & Executing
-    await manager.broadcast({
-        "type": "stage_update",
-        "data": {"stage": "Guardrail & Execution", "progress": 70, "description": "Evaluating 5 safety policies and executing outreach"}
-    })
-
-    # 5. Process and Broadcast Cases one-by-one (Paced)
+    # 5. Process and Broadcast Cases one-by-one with Continuous Progress Updates
     policy_engine = PolicyEngine(store)
     batch_outcomes_records = []
     contacts_avoided = 0
@@ -311,11 +324,14 @@ async def process_batch_background(payments: list, delay_ms: int = 50):
                         degraded = True
                         degradation_reason = err_desc
                 
+                # Only invoke LLM if the diagnosis was from the fallback classification path
+                use_llm_nudge = (diag.source == "llm_fallback")
                 msg = conv_generator.generate_nudge(
                     customer_name=get_customer_name(p.customer_id),
                     amount_paise=p.amount_paise,
                     payment_link=payment_link,
-                    cause=diag.cause
+                    cause=diag.cause,
+                    use_llm=use_llm_nudge
                 )
                 convo.append({
                     "sender": "bot",
@@ -411,6 +427,21 @@ async def process_batch_background(payments: list, delay_ms: int = 50):
         store.upsert_case(case_data)
         await manager.broadcast_audit_entry(case_data)
 
+        # Continuous Progress Calculation driven by completed case count
+        completed_count = i + 1
+        progress_percentage = max(6, min(100, int((completed_count / total_cases) * 100)))
+
+        await manager.broadcast({
+            "type": "stage_update",
+            "data": {
+                "stage": "Guardrail & Execution",
+                "progress": progress_percentage,
+                "completed": completed_count,
+                "total": total_cases,
+                "description": f"Evaluating policy & executing ({completed_count}/{total_cases}) · {lifecycle}"
+            }
+        })
+
         # --- Evaluate Baselines Parallel ---
         # 1. FCFS
         fcfs_dec = fcfs_map.get(p.id)
@@ -444,6 +475,7 @@ async def process_batch_background(payments: list, delay_ms: int = 50):
 
         if delay_ms > 0:
             await asyncio.sleep(delay_ms / 1000.0)
+
 
     # 6. Finalize comparative stats
     results_cache.optimized_recovered_paise = opt_recovered
@@ -527,8 +559,9 @@ def seed_batch(background_tasks: BackgroundTasks, limit: int = Query(210)):
     store.clear_all()
     from seed.seed_data import generate_seed_payments
     payments = generate_seed_payments(count=limit)
-    background_tasks.add_task(process_batch_background, payments, 50)
+    background_tasks.add_task(process_batch_background, payments, 20)
     return {"status": "started", "cases_seeded": len(payments)}
+
 
 @router.post("/recalibrate")
 def recalibrate_model():
