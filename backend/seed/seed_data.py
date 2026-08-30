@@ -47,8 +47,12 @@ def generate_seed_payments(count: int = 210) -> List[FailedPayment]:
     payments = []
     base_time = datetime.now() - timedelta(days=2)
 
+    # Number of adversarial cases to append (at most 4 for large batches, fewer for tiny batches)
+    adv_count = min(4, max(0, count // 20)) if count < 50 else 4
+    normal_count = max(1, count - adv_count)
+
     # 1. Generate normal synthetic payments
-    for i in range(1, count - 10):
+    for i in range(1, normal_count + 1):
         # Determine failure cause
         cause = random.choice(list(FAILURE_REASONS.keys()))
         error_code, error_reason = random.choice(FAILURE_REASONS[cause])
@@ -80,6 +84,7 @@ def generate_seed_payments(count: int = 210) -> List[FailedPayment]:
             error_reason=error_reason,
             timestamp=timestamp
         ))
+
 
     # 2. Explicitly append targeted ADVERSARIAL payments
     # Adversarial payment 1: Prompt Injection trying to force an instant ALLOW and high expected value

@@ -61,7 +61,7 @@ export default function UpliftComparison() {
             ₹{optimizedRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
           </span>
           <span className="text-[10px] text-emerald-500/80 mt-1 block">
-            +{uplift}% vs FCFS
+            {uplift >= 0 ? `+${uplift}%` : `${uplift}%`} vs FCFS
           </span>
         </div>
 
@@ -83,7 +83,7 @@ export default function UpliftComparison() {
             ₹{ha ? (ha.recovered_paise / 100.0).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '—'}
           </span>
           <span className="text-[10px] text-amber-400/80 mt-1 block">
-            {ha ? `+${ha.uplift_pct}% vs baseline` : 'Greedy high ticket'}
+            {ha ? `${ha.uplift_pct >= 0 ? '+' : ''}${ha.uplift_pct}% vs baseline` : 'Greedy high ticket'}
           </span>
         </div>
 
@@ -94,9 +94,10 @@ export default function UpliftComparison() {
             ₹{hp ? (hp.recovered_paise / 100.0).toLocaleString('en-IN', { maximumFractionDigits: 0 }) : '—'}
           </span>
           <span className="text-[10px] text-sky-400/80 mt-1 block">
-            {hp ? `+${hp.uplift_pct}% vs baseline` : 'Greedy high win-rate'}
+            {hp ? `${hp.uplift_pct >= 0 ? '+' : ''}${hp.uplift_pct}% vs baseline` : 'Greedy high win-rate'}
           </span>
         </div>
+
       </div>
 
       {/* Breakdown Chart */}

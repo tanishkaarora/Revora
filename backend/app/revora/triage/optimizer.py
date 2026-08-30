@@ -107,14 +107,18 @@ class TriageOptimizer:
         low_amount_cases = [p for p in payments if p.amount_paise < self.low_amount_threshold_paise]
         
         if low_amount_cases:
-            # We want to allocate at least min(fairness_slots, len(low_amount_cases), capacity_whatsapp) to whatsapp
-            target_slots = min(self.fairness_floor_slots, len(low_amount_cases), self.capacity_whatsapp)
+            # We reserve proportional slots for low-amount fairness (capped at 20% of WhatsApp capacity)
+            max_fairness_cap = max(1, int(self.capacity_whatsapp * 0.2))
+            target_slots = min(self.fairness_floor_slots, len(low_amount_cases), max_fairness_cap)
+            if len(payments) < 50:
+                target_slots = min(target_slots, max(1, len(low_amount_cases) // 3))
             prob += pulp.lpSum(
                 x_vars[(p.id, a)] 
                 for p in low_amount_cases 
                 for a in actions 
                 if ACTION_TO_CHANNEL[a] == "whatsapp"
             ) >= target_slots
+
 
         # 8. Solve the LP
         try:

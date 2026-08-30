@@ -188,7 +188,7 @@ export default function Dashboard() {
               <span className="text-xs font-medium text-indigo-400 block tracking-wide uppercase">Optimization Uplift</span>
               <div className="flex items-baseline gap-2 mt-1">
                 <span className="text-3xl sm:text-4xl font-bold font-display text-indigo-300 tracking-tight">
-                  +{comparison.uplift_pct || 51.6}%
+                  {comparison.uplift_pct !== undefined ? `${comparison.uplift_pct >= 0 ? '+' : ''}${comparison.uplift_pct}%` : '+51.6%'}
                 </span>
                 <span className="text-xs font-medium text-indigo-300">vs Naive FCFS</span>
               </div>
