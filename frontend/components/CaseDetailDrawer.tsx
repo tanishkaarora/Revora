@@ -15,9 +15,11 @@ export default function CaseDetailDrawer() {
   const cases = useAppStore((state) => state.cases);
   const activeCaseId = useAppStore((state) => state.activeCaseId);
   const setActiveCaseId = useAppStore((state) => state.setActiveCaseId);
+  const selectedTab = useAppStore((state) => state.selectedTab);
 
   const c = cases.find(item => item.id === activeCaseId);
-  if (!c) return null;
+  if (!c || selectedTab !== 'overview') return null;
+
 
   const amountRupees = c.amount_paise / 100.0;
   const costRupees = c.cost / 100.0;

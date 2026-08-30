@@ -37,8 +37,8 @@ export default function WhatsAppSimulator() {
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
 
-  // Find active case
-  const activeCase = cases.find(c => c.id === activeCaseId);
+  // Find active case (default to first case if not explicitly selected)
+  const activeCase = cases.find(c => c.id === activeCaseId) || cases[0];
 
   // Derive robust customer name
   const customerName = useMemo(() => {
@@ -74,15 +74,17 @@ export default function WhatsAppSimulator() {
 
   const handleSend = async (textToSend: string) => {
     const text = textToSend.trim();
-    if (!activeCaseId || !text || isSending) return;
+    const targetCaseId = activeCase?.id;
+    if (!targetCaseId || !text || isSending) return;
     setIsSending(true);
     try {
-      await simulateReply(activeCaseId, text);
+      await simulateReply(targetCaseId, text);
       setInputText('');
     } finally {
       setIsSending(false);
     }
   };
+
 
   const handleChipClick = (replyText: string) => {
     // Populates the input field so the presenter can review / edit before submitting

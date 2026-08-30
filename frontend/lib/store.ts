@@ -178,7 +178,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     return { auditEntries: [entry, ...state.auditEntries].slice(0, 100) };
   }),
 
-  setSelectedTab: (selectedTab) => set({ selectedTab }),
+  setSelectedTab: (selectedTab) => set({ selectedTab, activeCaseId: null }),
+
 
   fetchCases: async () => {
     try {
