@@ -1,7 +1,7 @@
 // frontend/components/WhatsAppSimulator.tsx
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppStore, CaseData } from '../lib/store';
-import { Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCheck, Sparkles, MessageSquare } from 'lucide-react';
+import { Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCheck, Sparkles, MessageSquare, Loader2 } from 'lucide-react';
 
 const FIRST_NAMES = [
   "Rahul", "Amit", "Priya", "Sneha", "Vikram", "Anjali", "Rohan", "Neha", 
@@ -36,6 +36,7 @@ export default function WhatsAppSimulator() {
 
   const [inputText, setInputText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Find active case (default to first case if not explicitly selected)
   const activeCase = cases.find(c => c.id === activeCaseId) || cases[0];
@@ -72,24 +73,43 @@ export default function WhatsAppSimulator() {
     }
   }, [activeCase, customerName]);
 
-  const handleSend = async (textToSend: string) => {
-    const text = textToSend.trim();
+  const handleSend = async (textToSend?: string) => {
+    const text = (textToSend !== undefined ? textToSend : inputText).trim();
     const targetCaseId = activeCase?.id;
     if (!targetCaseId || !text || isSending) return;
+    
     setIsSending(true);
+    setInputText('');
     try {
       await simulateReply(targetCaseId, text);
-      setInputText('');
     } finally {
       setIsSending(false);
     }
   };
 
-
   const handleChipClick = (replyText: string) => {
-    // Populates the input field so the presenter can review / edit before submitting
     setInputText(replyText);
   };
+
+  // Format conversation history - ensure outbound nudge is always present as the first message
+  const rawConversation = activeCase?.conversation || [];
+  const hasOutbound = rawConversation.some(m => m.sender === 'bot');
+
+  const displayConversation = hasOutbound
+    ? rawConversation
+    : (activeCase ? [
+        {
+          sender: 'bot' as const,
+          text: outboundNudgeText,
+          timestamp: activeCase.timestamp || new Date().toISOString()
+        },
+        ...rawConversation
+      ] : []);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [displayConversation.length, isSending]);
 
   if (!activeCase) {
     return (
@@ -104,21 +124,6 @@ export default function WhatsAppSimulator() {
       </div>
     );
   }
-
-  // Format conversation history - ensure outbound nudge is always present as the first message
-  const rawConversation = activeCase.conversation || [];
-  const hasOutbound = rawConversation.some(m => m.sender === 'bot');
-
-  const displayConversation = hasOutbound
-    ? rawConversation
-    : [
-        {
-          sender: 'bot' as const,
-          text: outboundNudgeText,
-          timestamp: activeCase.timestamp || new Date().toISOString()
-        },
-        ...rawConversation
-      ];
 
   const initialLetter = customerName ? customerName[0].toUpperCase() : 'C';
 
@@ -197,12 +202,21 @@ export default function WhatsAppSimulator() {
             </div>
           );
         })}
+
+        {isSending && (
+          <div className="self-start bg-[#202C33] text-gray-400 rounded-xl px-3 py-2 text-[11px] border border-[#2A3942] flex items-center gap-2">
+            <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
+            <span>Revora is extracting payment commitment...</span>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Suggested Quick Replies Header & Chips */}
       <div className="bg-[#111B21] px-3 pt-2 pb-1.5 border-t border-[#232630]/80 shrink-0">
         <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block mb-1.5 font-semibold">
-          Suggested Replies (Click to populate):
+          Suggested Replies (Click to populate or send):
         </span>
         <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none pb-1">
           {SUGGESTED_REPLIES.map((reply, i) => (
@@ -214,7 +228,7 @@ export default function WhatsAppSimulator() {
                 handleChipClick(reply);
               }}
               className="bg-[#202C33] hover:bg-[#2A3942] active:scale-95 border border-[#2A3942] hover:border-emerald-500/40 text-emerald-400 text-[10px] px-3 py-1 rounded-full transition-all cursor-pointer font-medium"
-              title="Click to populate reply text"
+              title="Click to populate reply"
             >
               {reply}
             </button>
@@ -240,7 +254,7 @@ export default function WhatsAppSimulator() {
             e.stopPropagation();
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
-              handleSend(inputText);
+              handleSend();
             }
           }}
           placeholder="Type simulated customer reply..."
@@ -250,16 +264,21 @@ export default function WhatsAppSimulator() {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            handleSend(inputText);
+            handleSend();
           }}
           disabled={isSending || !inputText.trim()}
           className="w-8 h-8 rounded-full bg-[#00A884] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white cursor-pointer hover:bg-[#008F72] transition-all shadow-md active:scale-95 shrink-0"
           title="Send simulated reply"
         >
-          <Send className="w-3.5 h-3.5 rotate-45" />
+          {isSending ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          ) : (
+            <Send className="w-3.5 h-3.5 rotate-45" />
+          )}
         </button>
       </div>
     </div>
   );
 }
+
 

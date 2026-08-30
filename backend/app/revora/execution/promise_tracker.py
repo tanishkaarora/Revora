@@ -45,6 +45,22 @@ class PromiseTracker:
         case = self.store.get_case(failed_payment_id)
         if case:
             conv = case.get("conversation", [])
+            # If no initial bot message in conv, synthesize the initial outbound nudge first
+            has_bot = any(m.get("sender") == "bot" for m in conv)
+            if not has_bot:
+                from seed.seed_data import get_customer_name
+                c_name = get_customer_name(customer_id)
+                amount_rupees = case.get("amount_paise", 100000) / 100.0
+                cause = case.get("cause", "unknown")
+                from app.llm.fallback_keywords import fallback_generate_hinglish_message
+                link = f"https://rzp.io/l/retry_{failed_payment_id}"
+                initial_nudge = fallback_generate_hinglish_message(c_name, amount_rupees, link, cause)
+                conv.insert(0, {
+                    "sender": "bot",
+                    "text": initial_nudge,
+                    "timestamp": case.get("timestamp", timestamp)
+                })
+
             # Append user reply
             conv.append({
                 "sender": "user",
@@ -52,7 +68,7 @@ class PromiseTracker:
                 "timestamp": timestamp
             })
             
-            # If they committed, we might send an automated confirmation message
+            # If they committed, send an automated confirmation message
             if commitment.commits:
                 promised_date_label = commitment.promised_date if commitment.promised_date else "jald hi"
                 bot_reply = f"Thank you! Humne note kar liya hai ki aap {promised_date_label} tak pay karenge. Tab tak hum aapko disturb nahi karenge."
@@ -71,6 +87,7 @@ class PromiseTracker:
                 
             case["conversation_json"] = json.dumps(conv) # convert to JSON list string
             self.store.upsert_case(case)
+
             
         return commitment
 

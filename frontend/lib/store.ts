@@ -297,6 +297,22 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   simulateReply: async (caseId, text) => {
+    // 1. Optimistic conversation append for immediate UI feedback
+    const currentCase = get().cases.find(c => c.id === caseId);
+    if (currentCase) {
+      const conv = currentCase.conversation ? [...currentCase.conversation] : [];
+      conv.push({
+        sender: 'user',
+        text,
+        timestamp: new Date().toISOString()
+      });
+      get().updateCase({
+        ...currentCase,
+        conversation: conv
+      });
+    }
+
+    // 2. Perform backend commitment extraction and state update
     try {
       const response = await fetch(`${BACKEND_URL}/cases/${caseId}/simulate-reply`, {
         method: 'POST',
@@ -315,6 +331,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.error('Failed to simulate reply:', error);
     }
   },
+
 
   fetchPromises: async () => {
     try {
