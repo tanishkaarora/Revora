@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+env/
+
+# Build and runtime outputs
+.next/
+dist/
+build/
+out/
+*.db
+*.sqlite
+*.sqlite3
+
+# Python cache & testing
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# IDE and OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
