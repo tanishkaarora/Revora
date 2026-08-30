@@ -173,7 +173,7 @@ export default function CaseDetailDrawer() {
                   <Zap className="w-3.5 h-3.5" /> Optimal Recovery Action
                 </span>
                 <span className="text-[10px] text-gray-400 bg-[#10121A] px-2 py-0.5 rounded border border-[#202534]">
-                  Revora Optimizer
+                  Triage Result
                 </span>
               </div>
 
@@ -278,9 +278,10 @@ export default function CaseDetailDrawer() {
                   Decision Audit Trail
                 </h4>
                 <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">
-                  Revora Audit
+                  Verified Trace
                 </span>
               </div>
+
 
               <div className="space-y-4 pl-4 border-l border-[#222736] relative text-xs">
                 {/* 1. Diagnosis */}

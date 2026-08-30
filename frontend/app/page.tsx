@@ -72,38 +72,33 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent text-gray-100 font-sans selection:bg-emerald-500/20 selection:text-emerald-400 relative">
+    <div className="min-h-screen bg-[#0B0D13] text-gray-100 font-sans selection:bg-emerald-500/20 selection:text-emerald-400 relative">
 
-      {/* Glow effects behind content */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none"></div>
-      <div className="absolute top-1/3 right-1/4 w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[150px] pointer-events-none"></div>
-
-      {/* Header / Nav (Sticky on scroll past top, with blur backdrop) */}
-      <header className="sticky top-0 z-50 w-full border-b border-[#232630]/30 bg-[#0A0B0F]/80 backdrop-blur-md transition-all duration-300">
+      {/* Header / Nav */}
+      <header className="sticky top-0 z-50 w-full border-b border-[#1E222D] bg-[#0E1017]/90 backdrop-blur-md transition-all duration-300">
         <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold font-mono text-base tracking-tighter">
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold font-mono text-base tracking-tighter shadow-md shadow-emerald-500/20">
               R
             </div>
             <div>
-              <h1 className="text-sm font-black tracking-wider uppercase">
-                REVORA <span className="text-[10px] text-gray-500 font-normal">v2.0</span>
+              <h1 className="text-sm font-bold tracking-wider uppercase text-white">
+                REVORA <span className="text-[10px] text-gray-400 font-normal">v2.0</span>
               </h1>
             </div>
           </div>
 
-
           <Link 
             href="/dashboard" 
-            className="px-4 py-2 text-xs font-bold font-mono uppercase tracking-wider text-emerald-400 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-500/40 rounded-xl transition-all duration-300 flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-semibold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/20 rounded-xl transition-all duration-300 flex items-center gap-1.5 cursor-pointer"
           >
-            Launch Console →
+            Launch Command Center →
           </Link>
         </div>
       </header>
 
-      {/* Live Data Ticker Strip (Synthetic loop of live recovery activity) */}
-      <div className="ticker-wrap w-full bg-[#0A0B0F]/40 border-b border-[#232630]/30 py-2 overflow-hidden flex items-center relative z-20">
+      {/* Live Data Ticker Strip */}
+      <div className="w-full bg-[#0E1017] border-b border-[#1E222D] py-2 overflow-hidden flex items-center relative z-20">
         <div className="ticker__move flex items-center whitespace-nowrap">
           {[
             "₹4,200 recovered from gateway failure",
@@ -126,8 +121,8 @@ export default function LandingPage() {
             "₹890 payment recovered via WhatsApp interactive nudge",
             "Veto switch standby: policy guardrails enforcing 100% compliance"
           ]).map((item, index) => (
-            <span key={index} className="mx-6 text-[10px] font-mono text-gray-400 flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500/80 animate-pulse"></span>
+            <span key={index} className="mx-6 text-[11px] font-sans text-gray-400 flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
               {item}
               <span className="text-gray-700 ml-4">·</span>
             </span>
@@ -136,7 +131,7 @@ export default function LandingPage() {
       </div>
 
       {/* Hero Section */}
-      <section className="max-w-5xl mx-auto px-6 pt-8 pb-12 text-center relative z-10">
+      <section className="max-w-5xl mx-auto px-6 pt-12 pb-12 text-center relative z-10">
         <motion.div
           initial="hidden"
           animate="visible"
@@ -144,18 +139,18 @@ export default function LandingPage() {
           variants={fadeIn}
           className="space-y-4"
         >
-          <span className="inline-block text-[10px] sm:text-xs font-black font-mono tracking-[0.2em] text-emerald-500 bg-emerald-500/5 border border-emerald-500/10 px-3.5 py-1 rounded-full uppercase">
+          <span className="inline-block text-[11px] font-semibold tracking-wider text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-1 rounded-full uppercase">
             RAZORPAY AI BUILDATHON 2026 · AI REVENUE RECOVERY
           </span>
           
-          <h2 className="text-3xl sm:text-5xl lg:text-[62px] font-semibold tracking-tight leading-[1.05] text-white max-w-4xl mx-auto display-font">
+          <h2 className="text-3xl sm:text-5xl lg:text-[56px] font-bold tracking-tight leading-[1.08] text-white max-w-4xl mx-auto font-display">
             Most failed payments aren&apos;t gone. <br/>
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400">
               They&apos;re just unclaimed.
             </span>
           </h2>
           
-          <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto leading-relaxed">
+          <p className="text-sm sm:text-base text-gray-400 max-w-2xl mx-auto leading-relaxed font-sans">
             Revora decides where a merchant&apos;s limited recovery effort earns the most back. 
             Guardrail makes sure it never oversteps.
           </p>
@@ -163,52 +158,35 @@ export default function LandingPage() {
           <div className="pt-2">
             <Link 
               href="/dashboard" 
-              className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-sm font-bold uppercase tracking-wider glow-cta shadow-[0_0_40px_rgba(16,185,129,0.4)] hover:shadow-[0_0_60px_rgba(16,185,129,0.6)] transition-shadow duration-300 cursor-pointer"
+              className="inline-flex items-center gap-2 px-7 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm tracking-wide transition-all shadow-lg shadow-emerald-600/20 cursor-pointer"
             >
-              Launch the Command Center <ArrowRight className="w-4 h-4" />
+              Launch Command Center <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
         </motion.div>
 
-        {/* Mock Browser Chrome Frame displaying Dashboard Screenshot Preview Peek */}
+        {/* Integrated Product UI Mockup */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.8, ease: "easeOut" }}
-          className="mt-8 max-w-4xl mx-auto bg-[#111319]/80 border border-[#232630]/80 rounded-2xl overflow-hidden shadow-2xl shadow-emerald-950/20 backdrop-blur-sm relative max-h-[420px]"
+          className="mt-10 max-w-4xl mx-auto surface-card rounded-2xl overflow-hidden shadow-2xl relative"
         >
-          {/* Browser Top Bar */}
-          <div className="bg-[#15171F] px-4 py-2.5 border-b border-[#232630]/80 flex items-center gap-3">
-            {/* Window Dots */}
-            <div className="flex gap-1.5">
-              <span className="w-3 h-3 rounded-full bg-red-500/60 block"></span>
-              <span className="w-3 h-3 rounded-full bg-yellow-500/60 block"></span>
-              <span className="w-3 h-3 rounded-full bg-green-500/60 block"></span>
-            </div>
-            {/* Address Bar */}
-            <div className="flex-1 max-w-md mx-auto bg-[#0A0B0F]/70 border border-[#232630]/50 rounded-lg py-1 px-3 text-[10px] font-mono text-gray-500 tracking-wide text-left truncate flex items-center gap-1.5">
-              <span className="text-emerald-500/60">https://</span>
-              <span>localhost:3000/dashboard</span>
-            </div>
-          </div>
-          
-          {/* Browser Content / Image Container */}
           <div className="relative w-full overflow-hidden bg-[#0A0B0F]">
             <img 
               src="/dashboard-screenshot.png" 
               alt="Revora Recovery Command Center Live Dashboard" 
-              className="w-full h-auto block object-cover object-top hover:scale-[1.01] transition-transform duration-700 ease-out"
+              className="w-full h-auto block object-cover object-top"
             />
-
-            {/* Bottom Gradient Fade Mask for Intentional Preview Peek */}
             <div 
-              className="absolute inset-x-0 bottom-0 h-36 pointer-events-none z-10"
+              className="absolute inset-x-0 bottom-0 h-32 pointer-events-none z-10"
               style={{
-                background: "linear-gradient(to bottom, transparent 30%, rgba(10, 11, 15, 0.85) 75%, #0A0B0F 100%)"
+                background: "linear-gradient(to bottom, transparent 20%, rgba(11, 13, 19, 0.9) 80%, #0B0D13 100%)"
               }}
             />
           </div>
         </motion.div>
+
 
         {/* Live Stat Strip (Animated appearance and counter logic) */}
         <motion.div 

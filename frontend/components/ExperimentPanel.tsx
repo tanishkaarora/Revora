@@ -53,13 +53,11 @@ export default function ExperimentPanel() {
             <h3 className="text-sm font-bold uppercase tracking-wider text-white">
               A/B Strategy Experimentation Engine
             </h3>
-            <span className="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
-              Revora Experiments
-            </span>
             <span className="text-[10px] uppercase font-mono font-bold px-2 py-0.5 rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20 flex items-center gap-1">
               <Sparkles className="w-3 h-3" />
               Controlled Trial
             </span>
+
           </div>
 
           <p className="text-xs text-gray-400">

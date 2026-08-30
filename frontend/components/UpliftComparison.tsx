@@ -36,8 +36,9 @@ export default function UpliftComparison() {
               Multi-Baseline Optimization Benchmark
             </h3>
             <span className="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
-              Revora Optimizer
+              Benchmark
             </span>
+
           </div>
           <p className="text-xs text-gray-400 mt-1">
             Comparing PuLP MILP optimizer against 3 industry standard heuristic baselines under strict capacity constraints.

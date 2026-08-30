@@ -43,8 +43,9 @@ export default function RecoveryFunnel() {
               Money Flow & Channel Routing Breakdown
             </h3>
             <span className="text-[10px] text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 font-medium">
-              Revora Optimizer
+              Capital Distribution
             </span>
+
           </div>
           <p className="text-xs text-gray-400 mt-1">
             Dynamic capital distribution across autonomous channels and fatigue-suppressed cohorts.

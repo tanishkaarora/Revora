@@ -56,8 +56,9 @@ export default function SystemHealth() {
           </div>
         </div>
         <span className="text-[10px] text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 font-medium">
-          Revora Guard
+          Policy Gate
         </span>
+
       </div>
 
       {/* Signature Two-Step Contrast Visual Flow: AI Proposal -> Policy Gate -> Decision */}

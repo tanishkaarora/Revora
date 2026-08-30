@@ -42,8 +42,9 @@ export default function FailureConsole() {
             </div>
           </div>
           <span className="text-[10px] text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 font-medium">
-            Revora Guard
+            Safety Proof
           </span>
+
         </div>
 
         {/* 3-Stage Adversarial Proof Visual */}

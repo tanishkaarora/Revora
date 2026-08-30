@@ -54,8 +54,9 @@ export default function DecisionStream() {
             Recovery Pulse — Real-Time Decision Pipeline
           </h2>
           <span className="text-[10px] text-gray-400 bg-[#161922] px-2.5 py-0.5 rounded-full border border-[#242938]">
-            Revora Pulse
+            Live Event Stream
           </span>
+
         </div>
         <span className="text-xs text-gray-400 font-sans">
           Click any transaction row for full decision trace and mathematical justification

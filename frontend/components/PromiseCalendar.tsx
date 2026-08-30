@@ -61,8 +61,9 @@ export default function PromiseCalendar() {
               Promise Protection Ledger & State Transitions
             </h3>
             <span className="text-[10px] text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded-full border border-purple-500/20 font-medium">
-              Revora Guard
+              State Tracker
             </span>
+
           </div>
           <p className="text-xs text-gray-400 mt-1">
             Automatic outreach suppression state-machine triggered upon extracting payment commitments.

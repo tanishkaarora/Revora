@@ -36,9 +36,10 @@ export default function CauseDonut() {
             <AlertCircle className="w-4 h-4 text-purple-400" />
             Failure Root Causes
           </h3>
-          <span className="text-[9px] font-mono font-bold text-blue-400 bg-blue-500/10 px-1.5 py-0.2 rounded border border-blue-500/20">
-            Revora Intelligence
+          <span className="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
+            Diagnosis
           </span>
+
         </div>
 
 

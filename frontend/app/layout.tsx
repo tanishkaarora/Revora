@@ -16,15 +16,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <div className="aurora-bg">
-          <div className="aurora-blob aurora-blob-1" />
-          <div className="aurora-blob aurora-blob-2" />
-          <div className="aurora-blob aurora-blob-3" />
-        </div>
-        <div className="grain-overlay" />
+      <body className={`${inter.className} bg-[#0B0D13] text-slate-100 antialiased`}>
         {children}
       </body>
     </html>
   );
 }
+
