@@ -433,9 +433,10 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Case Details Explainability Drawer Overlay */}
-      <CaseDetailDrawer />
+      {/* Case Details Explainability Drawer Overlay (Overview Quick-Inspect) */}
+      {selectedTab === 'overview' && <CaseDetailDrawer />}
     </main>
   );
 }
+
 

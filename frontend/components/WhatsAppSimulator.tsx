@@ -121,9 +121,12 @@ export default function WhatsAppSimulator() {
   const initialLetter = customerName ? customerName[0].toUpperCase() : 'C';
 
   return (
-    <div className="bg-[#111] border border-[#232630] rounded-xl shadow-2xl h-full flex flex-col overflow-hidden max-h-[520px]">
+    <div 
+      className="bg-[#111] border border-[#232630] rounded-xl shadow-2xl h-full flex flex-col overflow-hidden min-h-[440px] max-h-[560px] relative z-20"
+      onClick={(e) => e.stopPropagation()}
+    >
       {/* WhatsApp Header */}
-      <div className="bg-[#075E54] px-4 py-2.5 flex items-center justify-between text-white shadow-md z-10">
+      <div className="bg-[#075E54] px-4 py-2.5 flex items-center justify-between text-white shadow-md shrink-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-full bg-[#128C7E] border border-emerald-300/30 flex items-center justify-center text-xs font-black font-mono shadow-inner">
             {initialLetter}
@@ -137,14 +140,14 @@ export default function WhatsAppSimulator() {
           </div>
         </div>
         <div className="flex items-center gap-3 opacity-80">
-          <Video className="w-4 h-4 cursor-pointer hover:opacity-100" />
-          <Phone className="w-4 h-4 cursor-pointer hover:opacity-100" />
-          <MoreVertical className="w-4 h-4 cursor-pointer hover:opacity-100" />
+          <Video className="w-4 h-4 cursor-pointer hover:opacity-100" onClick={(e) => e.stopPropagation()} />
+          <Phone className="w-4 h-4 cursor-pointer hover:opacity-100" onClick={(e) => e.stopPropagation()} />
+          <MoreVertical className="w-4 h-4 cursor-pointer hover:opacity-100" onClick={(e) => e.stopPropagation()} />
         </div>
       </div>
 
-      {/* WhatsApp Chat Thread */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#0B141A] flex flex-col">
+      {/* WhatsApp Chat Thread (Scrollable internally) */}
+      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#0B141A] flex flex-col min-h-0">
         {/* Date bubble */}
         <div className="self-center bg-[#182229] border border-[#232630]/60 text-[#8696A0] text-[9px] px-2.5 py-0.5 rounded-md font-mono font-medium shadow-sm">
           TODAY · REVORA NUDGE CHANNEL
@@ -165,7 +168,7 @@ export default function WhatsAppSimulator() {
           return (
             <div
               key={index}
-              className={`max-w-[80%] rounded-xl p-3 text-xs shadow-md flex flex-col relative transition-all ${
+              className={`max-w-[85%] rounded-xl p-3 text-xs shadow-md flex flex-col relative transition-all ${
                 isBot 
                   ? 'self-start bg-[#202C33] text-[#E9EDEF] border border-[#2A3942]/60 rounded-tl-sm' 
                   : 'self-end bg-[#005C4B] text-[#E9EDEF] border border-emerald-600/40 rounded-tr-sm'
@@ -195,7 +198,7 @@ export default function WhatsAppSimulator() {
       </div>
 
       {/* Suggested Quick Replies Header & Chips */}
-      <div className="bg-[#111B21] px-3 pt-2 pb-1.5 border-t border-[#232630]/80">
+      <div className="bg-[#111B21] px-3 pt-2 pb-1.5 border-t border-[#232630]/80 shrink-0">
         <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block mb-1.5 font-semibold">
           Suggested Replies (Click to populate):
         </span>
@@ -204,7 +207,10 @@ export default function WhatsAppSimulator() {
             <button
               key={i}
               type="button"
-              onClick={() => handleChipClick(reply)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleChipClick(reply);
+              }}
               className="bg-[#202C33] hover:bg-[#2A3942] active:scale-95 border border-[#2A3942] hover:border-emerald-500/40 text-emerald-400 text-[10px] px-3 py-1 rounded-full transition-all cursor-pointer font-medium"
               title="Click to populate reply text"
             >
@@ -214,28 +220,38 @@ export default function WhatsAppSimulator() {
         </div>
       </div>
 
-      {/* WhatsApp Input Bar */}
-      <div className="bg-[#1F2C34] px-3 py-2.5 flex items-center gap-2.5 border-t border-[#232630]">
-        <Smile className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-200 transition-colors" />
-        <Paperclip className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-200 transition-colors" />
+      {/* WhatsApp Input Bar (Pinned at bottom, never clipped) */}
+      <div 
+        className="bg-[#1F2C34] px-3 py-2.5 flex items-center gap-2.5 border-t border-[#232630] shrink-0 sticky bottom-0 z-20"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Smile className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-200 transition-colors" onClick={(e) => e.stopPropagation()} />
+        <Paperclip className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-200 transition-colors" onClick={(e) => e.stopPropagation()} />
         <input
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onFocus={(e) => e.stopPropagation()}
           onKeyDown={(e) => {
+            e.stopPropagation();
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
               handleSend(inputText);
             }
           }}
-          placeholder="Type simulated reply..."
+          placeholder="Type simulated customer reply..."
           disabled={isSending}
           className="flex-1 bg-[#2A3942] rounded-lg text-xs px-3.5 py-2 text-white placeholder-gray-400 outline-none border border-transparent focus:border-emerald-500 transition-colors"
         />
         <button
-          onClick={() => handleSend(inputText)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleSend(inputText);
+          }}
           disabled={isSending || !inputText.trim()}
-          className="w-8 h-8 rounded-full bg-[#00A884] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white cursor-pointer hover:bg-[#008F72] transition-all shadow-md active:scale-95"
+          className="w-8 h-8 rounded-full bg-[#00A884] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white cursor-pointer hover:bg-[#008F72] transition-all shadow-md active:scale-95 shrink-0"
           title="Send simulated reply"
         >
           <Send className="w-3.5 h-3.5 rotate-45" />
@@ -244,3 +260,4 @@ export default function WhatsAppSimulator() {
     </div>
   );
 }
+

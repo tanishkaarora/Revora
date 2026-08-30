@@ -8,6 +8,8 @@ import {
   Send, RefreshCw, Users, Shield, Clock, CheckCircle2, XCircle,
   TrendingUp, Sparkles, Activity, Check, HelpCircle, Lock, Zap
 } from 'lucide-react';
+import WhatsAppSimulator from './WhatsAppSimulator';
+
 
 export default function CaseDetailDrawer() {
   const cases = useAppStore((state) => state.cases);
@@ -331,38 +333,19 @@ export default function CaseDetailDrawer() {
               </div>
             </div>
 
-            {/* Conversation Logs */}
-            {c.conversation && c.conversation.length > 0 && (
-              <div className="surface-card p-5 rounded-2xl space-y-3">
-                <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  Conversation Transcript
-                </h4>
-                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                  {c.conversation.map((msg, i) => (
-                    <div 
-                      key={i} 
-                      className={`p-3 rounded-xl text-xs leading-relaxed ${
-                        msg.sender === 'bot' 
-                          ? 'bg-emerald-950/20 border border-emerald-500/20 text-emerald-200' 
-                          : msg.sender === 'user'
-                          ? 'bg-sky-950/20 border border-sky-500/20 text-sky-200'
-                          : 'bg-gray-800/30 border border-gray-700/30 text-gray-300'
-                      }`}
-                    >
-                      <span className="text-[10px] font-medium text-gray-400 block mb-0.5">
-                        {msg.sender === 'bot' ? 'Revora Assistant' : msg.sender === 'user' ? 'Customer' : 'System'} • {new Date(msg.timestamp).toLocaleTimeString()}
-                      </span>
-                      {msg.text}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            {/* Interactive WhatsApp Simulator Preview */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                WhatsApp Nudge Channel Simulator
+              </h4>
+              <WhatsAppSimulator />
+            </div>
           </div>
         </motion.div>
       </div>
     </AnimatePresence>
   );
 }
+
 
