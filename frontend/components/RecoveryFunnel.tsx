@@ -1,7 +1,10 @@
 // frontend/components/RecoveryFunnel.tsx
 import React from 'react';
 import { useAppStore } from '../lib/store';
-import { Shield, Sparkles, UserCheck, RefreshCw, Ban, Send, AlertTriangle, Clock, CalendarX, Moon } from 'lucide-react';
+import { 
+  Shield, Sparkles, UserCheck, RefreshCw, Ban, Send, AlertTriangle, 
+  Clock, CalendarX, Moon, ArrowRight, DollarSign, Activity, CheckCircle2 
+} from 'lucide-react';
 
 export default function RecoveryFunnel() {
   const cases = useAppStore((state) => state.cases);
@@ -11,30 +14,18 @@ export default function RecoveryFunnel() {
   const totalValuePaise = cases.reduce((acc, c) => acc + c.amount_paise, 0);
   const totalValueRupees = totalValuePaise / 100.0;
 
-  // Stage 2: Diagnosed Causes
-  const balanceCount = cases.filter(c => c.cause === 'insufficient_balance').length;
-  const timeoutCount = cases.filter(c => c.cause === 'bank_timeout').length;
-  const otpCount = cases.filter(c => c.cause === 'wrong_otp').length;
-  const mandateCount = cases.filter(c => c.cause === 'expired_mandate').length;
-  const declineCount = cases.filter(c => c.cause === 'card_declined').length;
+  // Stage 3: Channel Allocations
+  const whatsappAlloc = cases.filter(c => c.allocated && (c.candidate_action === 'send_whatsapp_nudge' || c.candidate_action === 'suggest_alt_method'));
+  const humanAlloc = cases.filter(c => c.allocated && c.candidate_action === 'escalate_human');
+  const retryAlloc = cases.filter(c => c.allocated && c.candidate_action === 'silent_retry');
+  const suppressedCases = cases.filter(c => !c.allocated || c.candidate_action === 'suppress');
 
-  // Stage 3: Triage Allocations & Drop-off reasons
-  const whatsappAlloc = cases.filter(c => c.allocated && (c.candidate_action === 'send_whatsapp_nudge' || c.candidate_action === 'suggest_alt_method')).length;
-  const humanAlloc = cases.filter(c => c.allocated && c.candidate_action === 'escalate_human').length;
-  const retryAlloc = cases.filter(c => c.allocated && c.candidate_action === 'silent_retry').length;
-  
-  const negativeEvCount = cases.filter(c => (!c.allocated || c.candidate_action === 'suppress') && (c.expected_value <= 0 || c.triage_reason.toLowerCase().includes('expected value'))).length;
-  const capacityExhaustedCount = cases.filter(c => (!c.allocated || c.candidate_action === 'suppress') && (c.triage_reason.toLowerCase().includes('capacity exhausted') || c.triage_reason.toLowerCase().includes('capacity'))).length;
+  const whatsappRupees = whatsappAlloc.reduce((acc, c) => acc + c.amount_paise, 0) / 100.0;
+  const humanRupees = humanAlloc.reduce((acc, c) => acc + c.amount_paise, 0) / 100.0;
+  const retryRupees = retryAlloc.reduce((acc, c) => acc + c.amount_paise, 0) / 100.0;
+  const suppressedRupees = suppressedCases.reduce((acc, c) => acc + c.amount_paise, 0) / 100.0;
 
-  // Stage 4: Guardrail Drop-off reasons
-  const allowedCount = cases.filter(c => c.allocated && c.outcome === 'ALLOW').length;
-  const promisePendingBlocks = cases.filter(c => c.allocated && c.rule_fired === 'promise_pending').length;
-  const quietHoursBlocks = cases.filter(c => c.allocated && c.rule_fired === 'quiet_hours').length;
-  const contactCapBlocks = cases.filter(c => c.allocated && c.rule_fired === 'contact_cap_exceeded').length;
-  const killSwitchBlocks = cases.filter(c => c.allocated && c.rule_fired === 'kill_switch_active').length;
-  const refundEscalations = cases.filter(c => c.allocated && c.rule_fired === 'refund_signature_required').length;
-
-  // Stage 5: Recovered
+  // Recovered
   const recoveredCases = cases.filter(c => c.recovered);
   const recoveredCount = recoveredCases.length;
   const recoveredValuePaise = recoveredCases.reduce((acc, c) => acc + c.amount_recovered_paise, 0);
@@ -43,131 +34,106 @@ export default function RecoveryFunnel() {
   const recoveryRate = totalCount > 0 ? (recoveredCount / totalCount) * 100.0 : 0.0;
 
   return (
-    <div className="bg-[#13151C] border border-[#232630] rounded-xl p-5 shadow-lg space-y-4">
-      <div className="flex items-center justify-between border-b border-[#232630] pb-3">
+    <div className="surface-card rounded-2xl p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#1E222D] pb-4">
         <div>
-          <h3 className="text-sm font-semibold tracking-wide uppercase text-white">
-            Recovery Funnel & Drop-Off Attrition Root Causes
-          </h3>
-          <p className="text-xs text-gray-400">
-            Categorized attribution of case progression and drop-offs pulled directly from Triage reasons and Guardrail rules.
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-white tracking-tight font-display">
+              Money Flow & Channel Routing Breakdown
+            </h3>
+            <span className="text-[10px] text-indigo-300 bg-indigo-500/10 px-2 py-0.5 rounded-full border border-indigo-500/20 font-medium">
+              Revora Optimizer
+            </span>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">
+            Dynamic capital distribution across autonomous channels and fatigue-suppressed cohorts.
           </p>
         </div>
-        <div className="text-right">
-          <span className="text-xs text-gray-500 font-medium mr-2">Recovery Yield:</span>
-          <span className="text-sm font-bold font-mono text-emerald-400">{recoveryRate.toFixed(1)}%</span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400 font-sans">Aggregate Yield:</span>
+          <span className="text-sm font-bold font-technical text-emerald-400">
+            {recoveryRate.toFixed(1)}% (₹{recoveredValueRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })})
+          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 relative">
-        {/* Stage 1: Ingested */}
-        <div className="bg-[#0A0B0F] p-4 rounded-lg border border-[#1B1D25] relative">
-          <div className="absolute top-0 right-0 w-1.5 h-full bg-blue-500 rounded-r-lg opacity-40"></div>
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block font-mono">1. INGESTED</span>
-          <span className="text-3xl font-extrabold font-mono block text-blue-400 mt-2 leading-none">{totalCount}</span>
-          <span className="text-xs text-gray-400 font-mono block mt-1">₹{totalValueRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
-          <p className="text-[10px] text-gray-500 mt-2">All incoming failed transaction events</p>
-        </div>
-
-        {/* Stage 2: Diagnosed */}
-        <div className="bg-[#0A0B0F] p-4 rounded-lg border border-[#1B1D25] relative">
-          <div className="absolute top-0 right-0 w-1.5 h-full bg-purple-500 rounded-r-lg opacity-40"></div>
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block font-mono">2. DIAGNOSED</span>
-          <div className="mt-2 space-y-1 text-[10px] font-mono">
-            <div className="flex justify-between"><span className="text-orange-400">Balance:</span><span className="font-bold">{balanceCount}</span></div>
-            <div className="flex justify-between"><span className="text-blue-400">Timeout:</span><span className="font-bold">{timeoutCount}</span></div>
-            <div className="flex justify-between"><span className="text-purple-400">Wrong OTP:</span><span className="font-bold">{otpCount}</span></div>
-            <div className="flex justify-between"><span className="text-yellow-400">Mandate:</span><span className="font-bold">{mandateCount}</span></div>
-            <div className="flex justify-between"><span className="text-red-400">Declined:</span><span className="font-bold">{declineCount}</span></div>
+      {/* Money Flow Routing Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* WhatsApp Channel */}
+        <div className="bg-[#12141D] p-4 rounded-xl border border-[#202534] space-y-2 hover:border-emerald-500/30 transition-all">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+              <Send className="w-3.5 h-3.5" /> WhatsApp Nudges
+            </span>
+            <span className="text-gray-400 font-technical text-[11px]">{whatsappAlloc.length} cases</span>
           </div>
-        </div>
-
-        {/* Stage 3: Triaged & Triage Drop-offs */}
-        <div className="bg-[#0A0B0F] p-4 rounded-lg border border-[#1B1D25] relative">
-          <div className="absolute top-0 right-0 w-1.5 h-full bg-amber-500 rounded-r-lg opacity-40"></div>
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block font-mono">3. TRIAGED ALLOCATION</span>
-          <div className="mt-2 space-y-1 text-[10px] font-mono">
-            <div className="flex justify-between text-gray-300">
-              <span className="text-emerald-400">WhatsApp Nudges:</span>
-              <span className="font-bold">{whatsappAlloc}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span className="text-amber-400">Human Calls:</span>
-              <span className="font-bold">{humanAlloc}</span>
-            </div>
-            <div className="flex justify-between text-gray-300">
-              <span className="text-sky-400">Silent Retries:</span>
-              <span className="font-bold">{retryAlloc}</span>
-            </div>
-            <div className="pt-1.5 border-t border-[#1C1F2B] space-y-0.5">
-              <span className="text-[9px] uppercase font-bold text-gray-500 block">Triage Drop-Off Reasons:</span>
-              <div className="flex justify-between text-red-400">
-                <span>Negative ENV:</span>
-                <span>{negativeEvCount}</span>
-              </div>
-              <div className="flex justify-between text-orange-400">
-                <span>Capacity Full:</span>
-                <span>{capacityExhaustedCount}</span>
-              </div>
-            </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="font-technical text-base font-bold text-white">
+              ₹{whatsappRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-[11px] text-emerald-400 font-medium">P(rec) ~ 74%</span>
           </div>
+          <p className="text-[11px] text-gray-400 pt-1 border-t border-[#1C202C]">
+            Low friction interactive payment links with smart expiration reminders.
+          </p>
         </div>
 
-        {/* Stage 4: Guardrail Gated & Policy Drop-offs */}
-        <div className="bg-[#0A0B0F] p-4 rounded-lg border border-[#1B1D25] relative">
-          <div className="absolute top-0 right-0 w-1.5 h-full bg-pink-500 rounded-r-lg opacity-40"></div>
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider block font-mono">4. GUARDRAIL GATED</span>
-          <div className="mt-2 space-y-1 text-[10px] font-mono">
-            <div className="flex justify-between text-emerald-400">
-              <span>ALLOWED:</span>
-              <span className="font-bold">{allowedCount}</span>
-            </div>
-            <div className="pt-1.5 border-t border-[#1C1F2B] space-y-0.5">
-              <span className="text-[9px] uppercase font-bold text-gray-500 block">Guardrail Block Reasons:</span>
-              {promisePendingBlocks > 0 && (
-                <div className="flex justify-between text-purple-400">
-                  <span>Promise Pending:</span>
-                  <span>{promisePendingBlocks}</span>
-                </div>
-              )}
-              {quietHoursBlocks > 0 && (
-                <div className="flex justify-between text-indigo-400">
-                  <span>Quiet Hours:</span>
-                  <span>{quietHoursBlocks}</span>
-                </div>
-              )}
-              {contactCapBlocks > 0 && (
-                <div className="flex justify-between text-amber-400">
-                  <span>Contact Cap (3):</span>
-                  <span>{contactCapBlocks}</span>
-                </div>
-              )}
-              {killSwitchBlocks > 0 && (
-                <div className="flex justify-between text-red-400 font-bold">
-                  <span>Kill Switch:</span>
-                  <span>{killSwitchBlocks}</span>
-                </div>
-              )}
-              {refundEscalations > 0 && (
-                <div className="flex justify-between text-yellow-400">
-                  <span>Dual Auth Req:</span>
-                  <span>{refundEscalations}</span>
-                </div>
-              )}
-              {promisePendingBlocks === 0 && quietHoursBlocks === 0 && contactCapBlocks === 0 && (
-                <div className="text-gray-500 italic text-[9px]">All allocated cleared rules</div>
-              )}
-            </div>
+        {/* Silent Retry Channel */}
+        <div className="bg-[#12141D] p-4 rounded-xl border border-[#202534] space-y-2 hover:border-sky-500/30 transition-all">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-sky-400 font-semibold flex items-center gap-1.5">
+              <RefreshCw className="w-3.5 h-3.5" /> Silent Network Retry
+            </span>
+            <span className="text-gray-400 font-technical text-[11px]">{retryAlloc.length} cases</span>
           </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="font-technical text-base font-bold text-white">
+              ₹{retryRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-[11px] text-sky-400 font-medium">₹0 Direct Cost</span>
+          </div>
+          <p className="text-[11px] text-gray-400 pt-1 border-t border-[#1C202C]">
+            Zero-contact automatic retry during temporary bank gateway downtime.
+          </p>
         </div>
 
-        {/* Stage 5: Recovered */}
-        <div className="bg-emerald-950/20 p-4 rounded-lg border border-emerald-500/20 relative">
-          <div className="absolute top-0 right-0 w-1.5 h-full bg-emerald-500 rounded-r-lg opacity-50"></div>
-          <span className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider block font-mono">5. RECOVERED</span>
-          <span className="text-3xl font-extrabold font-mono block text-emerald-400 mt-2 leading-none">{recoveredCount}</span>
-          <span className="text-xs font-bold font-mono block text-white mt-1">₹{recoveredValueRupees.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-          <p className="text-[9px] text-emerald-500/60 mt-2 font-medium">Reconciled funds collected</p>
+        {/* Human Escalation */}
+        <div className="bg-[#12141D] p-4 rounded-xl border border-[#202534] space-y-2 hover:border-amber-500/30 transition-all">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-amber-400 font-semibold flex items-center gap-1.5">
+              <UserCheck className="w-3.5 h-3.5" /> High-Value Human Call
+            </span>
+            <span className="text-gray-400 font-technical text-[11px]">{humanAlloc.length} cases</span>
+          </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="font-technical text-base font-bold text-white">
+              ₹{humanRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-[11px] text-amber-400 font-medium">Top 2% VIP</span>
+          </div>
+          <p className="text-[11px] text-gray-400 pt-1 border-t border-[#1C202C]">
+            Dedicated voice concierge triage strictly reserved for high ticket transactions.
+          </p>
+        </div>
+
+        {/* Suppression & Policy Guard */}
+        <div className="bg-[#12141D] p-4 rounded-xl border border-[#202534] space-y-2 hover:border-rose-500/30 transition-all">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-rose-400 font-semibold flex items-center gap-1.5">
+              <Ban className="w-3.5 h-3.5" /> Suppressed Outreach
+            </span>
+            <span className="text-gray-400 font-technical text-[11px]">{suppressedCases.length} cases</span>
+          </div>
+          <div className="flex items-baseline justify-between pt-1">
+            <span className="font-technical text-base font-bold text-gray-300">
+              ₹{suppressedRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </span>
+            <span className="text-[11px] text-gray-400 font-medium">Preserved Trust</span>
+          </div>
+          <p className="text-[11px] text-gray-400 pt-1 border-t border-[#1C202C]">
+            Suppressed to prevent spam fatigue, quiet hours violations, and negative net EV.
+          </p>
         </div>
       </div>
     </div>
