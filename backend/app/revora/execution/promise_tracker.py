@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 from app.audit.store import AuditStore
 from app.revora.execution.commitment_extractor import CommitmentExtractor
-
 from app.guardrail.types import Commitment
 
 class PromiseTracker:
@@ -28,7 +27,6 @@ class PromiseTracker:
             # Default to tomorrow if date is not parsed
             promised_date = commitment.promised_date
             if not promised_date:
-                # Default to today
                 promised_date = datetime.now().strftime("%Y-%m-%d")
                 
             self.store.create_or_update_promise(
@@ -61,16 +59,21 @@ class PromiseTracker:
                     "timestamp": case.get("timestamp", timestamp)
                 })
 
-            # Append user reply
+            # Append customer user reply
             conv.append({
                 "sender": "user",
                 "text": reply_text,
                 "timestamp": timestamp
             })
             
-            # If they committed, send an automated confirmation message
+            # If customer committed, add confirmation badge and follow-up bot reply
             if commitment.commits:
-                promised_date_label = commitment.promised_date if commitment.promised_date else "jald hi"
+                promised_date_label = commitment.promised_date if commitment.promised_date else "soon"
+                conv.append({
+                    "sender": "system",
+                    "text": f"Payment commitment detected ({promised_date_label}). Outreach suppressed. Policy status: HOLD.",
+                    "timestamp": timestamp
+                })
                 bot_reply = f"Thank you! Humne note kar liya hai ki aap {promised_date_label} tak pay karenge. Tab tak hum aapko disturb nahi karenge."
                 conv.append({
                     "sender": "bot",
@@ -78,7 +81,7 @@ class PromiseTracker:
                     "timestamp": datetime.now().isoformat()
                 })
             else:
-                bot_reply = "Aap is safe link se retry kar sakte hain agar payment issue fix ho gaya ho. Thank you."
+                bot_reply = "Aap is safe link se retry kar sakte hain agar payment issue fix ho gaya ho: https://rzp.io/l/retry. Thank you!"
                 conv.append({
                     "sender": "bot",
                     "text": bot_reply,
@@ -87,7 +90,6 @@ class PromiseTracker:
                 
             case["conversation_json"] = json.dumps(conv) # convert to JSON list string
             self.store.upsert_case(case)
-
             
         return commitment
 
@@ -104,47 +106,38 @@ class PromiseTracker:
         if not promise:
             return False
             
-        promised_date_str = promise.get("promised_date")
-        if not promised_date_str:
-            # Immediate/same-day promise, suppress for today
-            return True
+        promised_date = promise.get("promised_date")
+        if not promised_date:
+            return True # indefinite pending promise, suppress contact
             
-        try:
-            current_dt = datetime.strptime(current_date_str, "%Y-%m-%d")
-            promised_dt = datetime.strptime(promised_date_str, "%Y-%m-%d")
-            
-            if promised_dt >= current_dt:
-                # Promise is still valid and in the future/today
-                return True
-            else:
-                # Promised date has passed without payment -> broken promise!
-                # Update status in db
-                self.store.create_or_update_promise(
-                    failed_payment_id=promise["failed_payment_id"],
-                    customer_id=customer_id,
-                    promised_date=promised_date_str,
-                    confidence=promise["confidence"],
-                    status="broken",
-                    raw_reply=promise["raw_reply"],
-                    timestamp=datetime.now().isoformat()
-                )
-                return False
-        except Exception:
-            # Fallback to true if date parsing fails to be safe
+        if promised_date >= current_date_str:
+            # Valid pending promise in the future/today -> SUPPRESS
             return True
+        else:
+            # Promise expired and payment not received -> transition to 'broken'
+            self.store.create_or_update_promise(
+                failed_payment_id=promise["failed_payment_id"],
+                customer_id=customer_id,
+                promised_date=promised_date,
+                confidence=promise.get("confidence", 0.8),
+                status="broken",
+                raw_reply=promise.get("raw_reply", ""),
+                timestamp=datetime.now().isoformat()
+            )
+            return False
 
     def mark_promise_kept(self, customer_id: str):
         """
-        Updates pending promise for customer to 'kept' when payment succeeds.
+        Transitions active promise to 'kept' when payment is successfully recovered.
         """
         promise = self.store.get_active_promise(customer_id)
         if promise:
             self.store.create_or_update_promise(
                 failed_payment_id=promise["failed_payment_id"],
                 customer_id=customer_id,
-                promised_date=promise["promised_date"],
-                confidence=promise["confidence"],
+                promised_date=promise.get("promised_date"),
+                confidence=promise.get("confidence", 1.0),
                 status="kept",
-                raw_reply=promise["raw_reply"],
+                raw_reply=promise.get("raw_reply", ""),
                 timestamp=datetime.now().isoformat()
             )

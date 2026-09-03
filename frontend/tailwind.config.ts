@@ -1,6 +1,7 @@
 import type { Config } from "tailwindcss";
 
 const config: Config = {
+  darkMode: ['class', '[data-theme="dark"]'],
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -14,34 +15,61 @@ const config: Config = {
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       colors: {
+        app: 'var(--bg-app)',
         surface: {
-          base: '#0A0B0E',
-          card: '#111318',
-          elevated: '#161922',
-          subtle: '#1C1F2B',
+          DEFAULT: 'var(--bg-surface)',
+          subtle: 'var(--bg-surface-subtle)',
+          elevated: 'var(--bg-surface-elevated)',
+          interactive: 'var(--bg-surface-interactive)',
+          hover: 'var(--bg-surface-interactive-hover)',
         },
         border: {
-          subtle: '#1E222D',
-          muted: '#282D3C',
-          active: '#3A4256',
+          subtle: 'var(--border-subtle)',
+          muted: 'var(--border-muted)',
+          active: 'var(--border-active)',
         },
-        accent: {
-          emerald: '#10B981',
-          teal: '#14B8A6',
-          indigo: '#6366F1',
-          amber: '#F59E0B',
-          rose: '#F43F5E',
-          sky: '#38BDF8',
-        }
-      },
-      backgroundImage: {
-        "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
-        "gradient-conic":
-          "conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops))",
+        content: {
+          primary: 'var(--text-primary)',
+          secondary: 'var(--text-secondary)',
+          tertiary: 'var(--text-tertiary)',
+          muted: 'var(--text-muted)',
+        },
+        brand: {
+          jade: {
+            DEFAULT: 'var(--color-jade)',
+            deep: 'var(--color-jade-deep)',
+            surface: 'var(--color-jade-surface)',
+            border: 'var(--color-jade-border)',
+            text: 'var(--color-jade-text)',
+          },
+          steel: {
+            DEFAULT: 'var(--color-steel)',
+            surface: 'var(--color-steel-surface)',
+            border: 'var(--color-steel-border)',
+            text: 'var(--color-steel-text)',
+          },
+          brass: {
+            DEFAULT: 'var(--color-brass)',
+            surface: 'var(--color-brass-surface)',
+            border: 'var(--color-brass-border)',
+            text: 'var(--color-brass-text)',
+          },
+          burgundy: {
+            DEFAULT: 'var(--color-burgundy)',
+            surface: 'var(--color-burgundy-surface)',
+            border: 'var(--color-burgundy-border)',
+            text: 'var(--color-burgundy-text)',
+          },
+          amber: {
+            DEFAULT: 'var(--color-amber)',
+            surface: 'var(--color-amber-surface)',
+            border: 'var(--color-amber-border)',
+            text: 'var(--color-amber-text)',
+          },
+        },
       },
     },
   },
   plugins: [],
 };
 export default config;
-

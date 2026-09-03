@@ -301,11 +301,23 @@ export const useAppStore = create<AppState>((set, get) => ({
     const currentCase = get().cases.find(c => c.id === caseId);
     if (currentCase) {
       const conv = currentCase.conversation ? [...currentCase.conversation] : [];
+      const hasBot = conv.some(m => m.sender === 'bot');
+      if (!hasBot) {
+        const cName = currentCase.customer_name || 'Customer';
+        const amountRupees = (currentCase.amount_paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        conv.unshift({
+          sender: 'bot',
+          text: `Hi ${cName}! Aapka ₹${amountRupees} ka payment complete nahi ho paya. Aap is secure link se retry kar sakte hain: https://rzp.io/l/retry_${caseId}`,
+          timestamp: currentCase.timestamp || new Date().toISOString()
+        });
+      }
+
       conv.push({
         sender: 'user',
         text,
         timestamp: new Date().toISOString()
       });
+
       get().updateCase({
         ...currentCase,
         conversation: conv
@@ -321,10 +333,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
       if (response.ok) {
         const data = await response.json();
-        get().updateCase({
-          ...data.case,
-          active_promise: data.case.active_promise
-        });
+        if (data.case) {
+          get().updateCase({
+            ...data.case,
+            customer_name: currentCase?.customer_name || data.case.customer_name,
+            active_promise: data.commitment?.commits ? data.commitment : data.case.active_promise
+          });
+        }
         await get().fetchPromises();
       }
     } catch (error) {

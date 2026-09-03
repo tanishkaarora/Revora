@@ -36,7 +36,6 @@ def list_promises():
 
 @router.get("/{id}")
 def get_case(id: str):
-
     case = store.get_case(id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
@@ -59,7 +58,13 @@ def simulate_reply(id: str, payload: SimulateReplyPayload):
         reply_text=payload.text
     )
     
+    updated_case = store.get_case(id)
+    promise = store.get_active_promise(case["customer_id"])
+    if updated_case:
+        updated_case["customer_name"] = get_customer_name(case["customer_id"])
+        updated_case["active_promise"] = promise
+        
     return {
         "commitment": commitment.model_dump(),
-        "case": store.get_case(id)
+        "case": updated_case
     }

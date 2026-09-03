@@ -1,46 +1,46 @@
-// frontend/components/EscalationLadder.tsx
+'use client';
+
 import React from 'react';
 import { Send, Users, Ban, ArrowRight } from 'lucide-react';
 
 export default function EscalationLadder() {
   return (
-    <div className="bg-[#13151C] border border-[#232630] rounded-xl p-5 shadow-lg flex flex-col justify-between h-full min-h-[220px]">
+    <div className="surface-card rounded-2xl p-5 sm:p-6 flex flex-col justify-between h-full min-h-[220px]">
       <div>
-        <h3 className="text-sm font-semibold tracking-wide uppercase text-gray-400 flex items-center gap-2 mb-4 border-b border-[#232630] pb-2">
-          Recovery Escalation Stage Ladder
+        <h3 className="text-xs font-semibold tracking-wide uppercase text-content-primary flex items-center gap-2 mb-4 border-b border-border-subtle pb-2">
+          Recovery Escalation Stage Hierarchy
         </h3>
 
-        <div className="flex items-center gap-2 text-gray-300">
+        <div className="flex items-center gap-2 text-content-primary">
           {/* Stage 1 */}
-          <div className="flex-1 bg-[#0A0B0F] p-3 rounded-lg border border-[#1B1D25] text-center">
-            <Send className="w-4 h-4 text-sky-400 mx-auto mb-1.5" />
-            <span className="text-[9px] font-bold font-mono text-sky-400 block">DAY 1</span>
-            <span className="text-[10px] font-medium block">Nudges</span>
+          <div className="flex-1 bg-surface-subtle p-3.5 rounded-xl border border-border-subtle text-center space-y-1">
+            <Send className="w-4 h-4 text-brand-steel mx-auto mb-1" />
+            <span className="text-[10px] font-bold font-technical text-brand-steel block">STAGE 1</span>
+            <span className="text-xs font-medium block text-content-primary">Automated Nudges</span>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-gray-700" />
+          <ArrowRight className="w-3.5 h-3.5 text-content-muted shrink-0" />
 
           {/* Stage 2 */}
-          <div className="flex-1 bg-[#0A0B0F] p-3 rounded-lg border border-[#1B1D25] text-center">
-            <Users className="w-4 h-4 text-amber-400 mx-auto mb-1.5" />
-            <span className="text-[9px] font-bold font-mono text-amber-400 block">DAY 15</span>
-            <span className="text-[10px] font-medium block">Human Calls</span>
+          <div className="flex-1 bg-surface-subtle p-3.5 rounded-xl border border-border-subtle text-center space-y-1">
+            <Users className="w-4 h-4 text-brand-brass mx-auto mb-1" />
+            <span className="text-[10px] font-bold font-technical text-brand-brass block">STAGE 2</span>
+            <span className="text-xs font-medium block text-content-primary">Voice Concierge</span>
           </div>
 
-          <ArrowRight className="w-3.5 h-3.5 text-gray-700" />
+          <ArrowRight className="w-3.5 h-3.5 text-content-muted shrink-0" />
 
           {/* Stage 3 */}
-          <div className="flex-1 bg-[#0A0B0F] p-3 rounded-lg border border-[#1B1D25] text-center">
-            <Ban className="w-4 h-4 text-red-400 mx-auto mb-1.5" />
-            <span className="text-[9px] font-bold font-mono text-red-400 block">DAY 30+</span>
-            <span className="text-[10px] font-medium block">Charge-offs</span>
+          <div className="flex-1 bg-surface-subtle p-3.5 rounded-xl border border-border-subtle text-center space-y-1">
+            <Ban className="w-4 h-4 text-brand-burgundy mx-auto mb-1" />
+            <span className="text-[10px] font-bold font-technical text-brand-burgundy block">STAGE 3</span>
+            <span className="text-xs font-medium block text-content-primary">Suppression</span>
           </div>
         </div>
       </div>
 
-      <div className="text-[9px] text-gray-500 mt-4 leading-normal">
-        *Revora prioritizes actions depending on duration since payment failure, solver efficiency, and customer response latency.
-
+      <div className="text-[11px] text-content-secondary mt-4 leading-normal font-sans pt-2 border-t border-border-subtle">
+        Revora routes actions dynamically according to Bayesian posterior probability, solver constraints, and customer latency.
       </div>
     </div>
   );

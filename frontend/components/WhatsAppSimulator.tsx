@@ -1,7 +1,11 @@
-// frontend/components/WhatsAppSimulator.tsx
+'use client';
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { useAppStore, CaseData } from '../lib/store';
-import { Send, Phone, Video, MoreVertical, Smile, Paperclip, CheckCheck, Sparkles, MessageSquare, Loader2 } from 'lucide-react';
+import { useAppStore } from '../lib/store';
+import { 
+  Send, Phone, Video, MoreVertical, Smile, Paperclip, 
+  CheckCheck, Sparkles, MessageSquare, Loader2, ShieldCheck, User, Calendar
+} from 'lucide-react';
 
 const FIRST_NAMES = [
   "Rahul", "Amit", "Priya", "Sneha", "Vikram", "Anjali", "Rohan", "Neha", 
@@ -25,7 +29,7 @@ const SUGGESTED_REPLIES = [
   "Sorry, balance nahi tha. Kal subah pay kar dunga pakka.",
   "OTP verify nahi ho raha tha, main Friday tak check karke complete kar dunga.",
   "Payment link send kardo alternative, card se abhi kar deta hu.",
-  "theek hai Monday pakka pay karunga",
+  "Theek hai Monday pakka pay karunga",
   "No, stop messaging me. I will not pay."
 ];
 
@@ -43,7 +47,7 @@ export default function WhatsAppSimulator() {
 
   // Derive robust customer name
   const customerName = useMemo(() => {
-    if (!activeCase) return '';
+    if (!activeCase) return 'Customer';
     if (activeCase.customer_name && activeCase.customer_name.trim() !== '') {
       return activeCase.customer_name;
     }
@@ -92,19 +96,25 @@ export default function WhatsAppSimulator() {
   };
 
   // Format conversation history - ensure outbound nudge is always present as the first message
-  const rawConversation = activeCase?.conversation || [];
-  const hasOutbound = rawConversation.some(m => m.sender === 'bot');
+  const rawConversation = useMemo(() => activeCase?.conversation || [], [activeCase?.conversation]);
+  const hasOutbound = useMemo(() => rawConversation.some(m => m.sender === 'bot'), [rawConversation]);
 
-  const displayConversation = hasOutbound
-    ? rawConversation
-    : (activeCase ? [
+  const displayConversation = useMemo(() => {
+    if (hasOutbound) {
+      return rawConversation;
+    }
+    if (activeCase) {
+      return [
         {
           sender: 'bot' as const,
           text: outboundNudgeText,
           timestamp: activeCase.timestamp || new Date().toISOString()
         },
         ...rawConversation
-      ] : []);
+      ];
+    }
+    return [];
+  }, [hasOutbound, rawConversation, activeCase, outboundNudgeText]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
@@ -113,13 +123,13 @@ export default function WhatsAppSimulator() {
 
   if (!activeCase) {
     return (
-      <div className="bg-[#13151C] border border-[#232630] rounded-xl p-6 shadow-lg h-full flex flex-col items-center justify-center text-center min-h-[420px]">
-        <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center text-emerald-400 mb-3 animate-pulse-slow">
-          <MessageSquare className="w-6 h-6" />
+      <div className="surface-card rounded-xl p-6 shadow-md h-full flex flex-col items-center justify-center text-center min-h-[400px]">
+        <div className="w-11 h-11 bg-brand-jade-surface border border-brand-jade-border rounded-xl flex items-center justify-center text-brand-jade mb-3">
+          <MessageSquare className="w-5 h-5" />
         </div>
-        <h4 className="text-sm font-bold text-gray-200">WhatsApp Nudge Simulator</h4>
-        <p className="text-xs text-gray-400 max-w-xs mt-2 leading-relaxed">
-          Select any case from the Decision Feed or stream to inspect Revora&apos;s outbound Hinglish message and simulate real-time customer replies.
+        <h4 className="text-sm font-semibold text-content-primary">WhatsApp Recovery Simulator</h4>
+        <p className="text-xs text-content-secondary max-w-xs mt-1.5 leading-relaxed">
+          Select any transaction to inspect Revora&apos;s outbound message and test real-time customer reply intelligence.
         </p>
       </div>
     );
@@ -129,35 +139,38 @@ export default function WhatsAppSimulator() {
 
   return (
     <div 
-      className="bg-[#111] border border-[#232630] rounded-xl shadow-2xl h-full flex flex-col overflow-hidden min-h-[440px] max-h-[560px] relative z-20"
+      className="bg-[#0B141A] border border-[#202C33] rounded-2xl shadow-xl h-full flex flex-col overflow-hidden min-h-[420px] max-h-[540px] relative z-20"
       onClick={(e) => e.stopPropagation()}
     >
       {/* WhatsApp Header */}
-      <div className="bg-[#075E54] px-4 py-2.5 flex items-center justify-between text-white shadow-md shrink-0 z-10">
+      <div className="bg-[#1F2C34] px-4 py-2.5 flex items-center justify-between text-white shadow-sm shrink-0 z-10 border-b border-[#2A3942]">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[#128C7E] border border-emerald-300/30 flex items-center justify-center text-xs font-black font-mono shadow-inner">
+          <div className="w-8 h-8 rounded-full bg-[#005C4B] border border-emerald-400/30 flex items-center justify-center text-xs font-bold text-white">
             {initialLetter}
           </div>
           <div>
-            <h4 className="text-xs font-bold leading-tight tracking-wide">{customerName}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="text-xs font-bold leading-tight tracking-wide text-gray-100">{customerName}</h4>
+              <span className="text-[10px] text-emerald-400 bg-emerald-950/60 px-1.5 py-0.2 rounded border border-emerald-500/30">Customer</span>
+            </div>
             <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"></span>
-              <span className="text-[9px] text-emerald-100 font-mono">online · Case: {activeCase.id}</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span className="text-[10px] text-emerald-200/80 font-mono">Case: {activeCase.id.slice(0, 8)} · WhatsApp Business API</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 opacity-80">
+        <div className="flex items-center gap-3 text-gray-300 opacity-80">
           <Video className="w-4 h-4 cursor-pointer hover:opacity-100" onClick={(e) => e.stopPropagation()} />
           <Phone className="w-4 h-4 cursor-pointer hover:opacity-100" onClick={(e) => e.stopPropagation()} />
           <MoreVertical className="w-4 h-4 cursor-pointer hover:opacity-100" onClick={(e) => e.stopPropagation()} />
         </div>
       </div>
 
-      {/* WhatsApp Chat Thread (Scrollable internally) */}
+      {/* WhatsApp Chat Thread (Scrollable) */}
       <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#0B141A] flex flex-col min-h-0">
         {/* Date bubble */}
         <div className="self-center bg-[#182229] border border-[#232630]/60 text-[#8696A0] text-[9px] px-2.5 py-0.5 rounded-md font-mono font-medium shadow-sm">
-          TODAY · REVORA NUDGE CHANNEL
+          TODAY · REVORA OUTREACH CHANNEL
         </div>
 
         {displayConversation.map((msg, index) => {
@@ -166,8 +179,12 @@ export default function WhatsAppSimulator() {
 
           if (isSystem) {
             return (
-              <div key={index} className="self-center bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] px-3 py-1 rounded-md font-mono text-center max-w-xs shadow-sm">
-                ✓ {msg.text}
+              <div 
+                key={index} 
+                className="self-center my-1 bg-emerald-950/70 border border-emerald-500/40 text-emerald-300 text-[10px] px-3.5 py-1.5 rounded-full font-sans text-center max-w-sm shadow-md flex items-center gap-2"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span>{msg.text}</span>
               </div>
             );
           }
@@ -177,24 +194,32 @@ export default function WhatsAppSimulator() {
               key={index}
               className={`max-w-[85%] rounded-xl p-3 text-xs shadow-md flex flex-col relative transition-all ${
                 isBot 
-                  ? 'self-start bg-[#202C33] text-[#E9EDEF] border border-[#2A3942]/60 rounded-tl-sm' 
-                  : 'self-end bg-[#005C4B] text-[#E9EDEF] border border-emerald-600/40 rounded-tr-sm'
+                  ? 'self-start bg-[#1F2C34] text-[#E9EDEF] border border-[#2A3942] rounded-tl-sm' 
+                  : 'self-end bg-[#005C4B] text-[#E9EDEF] border border-emerald-600/50 rounded-tr-sm'
               }`}
             >
-              <div className="text-[9px] font-mono font-bold mb-1 opacity-70 flex items-center gap-1">
+              {/* Distinct Sender Attribution Header */}
+              <div className="text-[10px] font-sans font-semibold mb-1 flex items-center justify-between gap-2 border-b border-white/10 pb-1">
                 {isBot ? (
-                  <>
-                    <Sparkles className="w-2.5 h-2.5 text-emerald-400" />
-                    <span className="text-emerald-400">Revora Assistant</span>
-                  </>
+                  <div className="flex items-center gap-1.5 text-emerald-400">
+                    <Sparkles className="w-3 h-3 text-emerald-400" />
+                    <span>Revora Business (Outbound Nudge)</span>
+                  </div>
                 ) : (
-                  <span className="text-emerald-200">{customerName}</span>
+                  <div className="flex items-center gap-1.5 text-emerald-100">
+                    <User className="w-3 h-3 text-emerald-300" />
+                    <span>{customerName} (Customer Reply)</span>
+                  </div>
                 )}
+                <span className="text-[9px] opacity-60 font-mono">
+                  {isBot ? 'Verified Business' : 'Inbound'}
+                </span>
               </div>
 
-              <p className="leading-relaxed text-[11px] whitespace-pre-wrap">{msg.text}</p>
-              <div className="self-end flex items-center gap-1 mt-1.5 opacity-60">
-                <span className="text-[8px] font-mono">
+              <p className="leading-relaxed text-[11px] whitespace-pre-wrap mt-0.5">{msg.text}</p>
+              
+              <div className="self-end flex items-center gap-1 mt-1 opacity-70">
+                <span className="text-[8px] font-mono text-gray-300">
                   {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
                 </span>
                 <CheckCheck className="w-3 h-3 text-sky-400" />
@@ -204,9 +229,9 @@ export default function WhatsAppSimulator() {
         })}
 
         {isSending && (
-          <div className="self-start bg-[#202C33] text-gray-400 rounded-xl px-3 py-2 text-[11px] border border-[#2A3942] flex items-center gap-2">
-            <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
-            <span>Revora is extracting payment commitment...</span>
+          <div className="self-start bg-[#1F2C34] text-emerald-300 rounded-xl px-3.5 py-2 text-[11px] border border-emerald-500/40 flex items-center gap-2 shadow-sm animate-pulse">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+            <span>Processing reply with NLP commitment extractor...</span>
           </div>
         )}
 
@@ -215,8 +240,8 @@ export default function WhatsAppSimulator() {
 
       {/* Suggested Quick Replies Header & Chips */}
       <div className="bg-[#111B21] px-3 pt-2 pb-1.5 border-t border-[#232630]/80 shrink-0">
-        <span className="text-[9px] font-mono text-gray-400 uppercase tracking-wider block mb-1.5 font-semibold">
-          Suggested Replies (Click to populate or send):
+        <span className="text-[9px] font-sans text-gray-400 uppercase tracking-wider block mb-1.5 font-medium">
+          Suggested Replies (Click to populate):
         </span>
         <div className="flex gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none pb-1">
           {SUGGESTED_REPLIES.map((reply, i) => (
@@ -227,7 +252,7 @@ export default function WhatsAppSimulator() {
                 e.stopPropagation();
                 handleChipClick(reply);
               }}
-              className="bg-[#202C33] hover:bg-[#2A3942] active:scale-95 border border-[#2A3942] hover:border-emerald-500/40 text-emerald-400 text-[10px] px-3 py-1 rounded-full transition-all cursor-pointer font-medium"
+              className="bg-[#202C33] hover:bg-[#2A3942] active:scale-95 border border-[#2A3942] hover:border-emerald-500/40 text-emerald-300 text-[10px] px-2.5 py-1 rounded-full transition-all cursor-pointer font-medium"
               title="Click to populate reply"
             >
               {reply}
@@ -236,7 +261,7 @@ export default function WhatsAppSimulator() {
         </div>
       </div>
 
-      {/* WhatsApp Input Bar (Pinned at bottom, never clipped) */}
+      {/* WhatsApp Input Bar */}
       <div 
         className="bg-[#1F2C34] px-3 py-2.5 flex items-center gap-2.5 border-t border-[#232630] shrink-0 sticky bottom-0 z-20"
         onClick={(e) => e.stopPropagation()}
@@ -259,15 +284,16 @@ export default function WhatsAppSimulator() {
           }}
           placeholder="Type simulated customer reply..."
           disabled={isSending}
-          className="flex-1 bg-[#2A3942] rounded-lg text-xs px-3.5 py-2 text-white placeholder-gray-400 outline-none border border-transparent focus:border-emerald-500 transition-colors"
+          className="flex-1 bg-[#2A3942] rounded-lg text-xs px-3.5 py-2 text-white placeholder-gray-400 outline-none border border-transparent focus:border-emerald-500 transition-colors font-sans"
         />
         <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             handleSend();
           }}
           disabled={isSending || !inputText.trim()}
-          className="w-8 h-8 rounded-full bg-[#00A884] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white cursor-pointer hover:bg-[#008F72] transition-all shadow-md active:scale-95 shrink-0"
+          className="w-8 h-8 rounded-full bg-[#00A884] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center text-white cursor-pointer hover:bg-[#008F72] transition-all shadow-sm active:scale-95 shrink-0"
           title="Send simulated reply"
         >
           {isSending ? (
@@ -280,5 +306,3 @@ export default function WhatsAppSimulator() {
     </div>
   );
 }
-
-

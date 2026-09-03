@@ -1,9 +1,10 @@
-// frontend/components/SystemHealth.tsx
+'use client';
+
 import React, { useEffect, useState } from 'react';
 import { useAppStore } from '../lib/store';
 import { 
-  Shield, Clock, Activity, ShieldAlert, ShieldCheck, 
-  AlertTriangle, CheckCircle2, XCircle, ArrowRight, Sparkles, Lock, Zap 
+  Shield, Clock, ShieldAlert, ShieldCheck, 
+  AlertTriangle, CheckCircle2, XCircle, ArrowRight, Sparkles, Lock, Zap, Check 
 } from 'lucide-react';
 
 export default function SystemHealth() {
@@ -43,93 +44,92 @@ export default function SystemHealth() {
   return (
     <div className="surface-card rounded-2xl p-5 sm:p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-[#1E222D] pb-3">
+      <div className="flex items-center justify-between border-b border-border-subtle pb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+          <div className="w-8 h-8 rounded-xl bg-brand-jade-surface border border-brand-jade-border flex items-center justify-center text-brand-jade">
             <Shield className="w-4 h-4" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white tracking-tight font-display">
-              Guardrail Safety Architecture
+            <h3 className="text-sm font-semibold text-content-primary tracking-tight font-display">
+              Deterministic Policy Engine
             </h3>
-            <p className="text-xs text-gray-400">Deterministic Policy Gate & Invariant Inforcement</p>
+            <p className="text-xs text-content-secondary">Hard Guardrails & Continuous Invariant Enforcement</p>
           </div>
         </div>
-        <span className="text-[10px] text-amber-300 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20 font-medium">
-          Policy Gate
+        <span className="text-[10px] text-brand-jade bg-brand-jade-surface px-2.5 py-0.5 rounded-full border border-brand-jade-border font-medium">
+          Deterministic Gate
         </span>
-
       </div>
 
-      {/* Signature Two-Step Contrast Visual Flow: AI Proposal -> Policy Gate -> Decision */}
-      <div className="bg-[#0A0B0E] p-4 rounded-xl border border-[#1E222D] space-y-3">
-        <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
-          Live Policy Invariant Execution Flow
+      {/* Signature Two-Step Contrast Visual Flow: AI Proposal -> Policy Gate -> Verdict */}
+      <div className="bg-surface-subtle p-4 rounded-xl border border-border-subtle space-y-3">
+        <span className="text-[11px] font-semibold text-content-secondary uppercase tracking-wider block">
+          Policy Invariant Execution Flow
         </span>
 
         <div className="grid grid-cols-1 md:grid-cols-11 gap-3 items-center">
           {/* Step 1: AI Recommendation */}
-          <div className="md:col-span-4 bg-[#141720] p-3.5 rounded-xl border border-[#232838] space-y-1.5">
+          <div className="md:col-span-4 bg-surface p-4 rounded-xl border border-border-subtle space-y-1.5">
             <div className="flex items-center justify-between text-[11px]">
-              <span className="text-indigo-400 font-semibold flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5" /> 1. AI Recommendation
+              <span className="text-brand-brass font-semibold flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5" /> 1. Model Proposal
               </span>
-              <span className="text-gray-400 font-technical text-[10px]">
+              <span className="text-content-tertiary font-technical text-[10px]">
                 {activeCase ? activeCase.id.slice(0, 8) : 'PAY-DEMO'}
               </span>
             </div>
-            <p className="text-xs text-gray-200 font-medium capitalize">
+            <p className="text-xs text-content-primary font-semibold capitalize">
               {activeCase ? activeCase.candidate_action.replace(/_/g, ' ') : 'Send WhatsApp Nudge'}
             </p>
-            <p className="text-[11px] text-gray-400 leading-normal">
-              Optimal EV allocation proposed for {activeCase?.cause ? activeCase.cause.replace(/_/g, ' ') : 'insufficient balance'}.
+            <p className="text-[11px] text-content-secondary leading-normal">
+              Optimal ENV allocation calculated for {activeCase?.cause ? activeCase.cause.replace(/_/g, ' ') : 'insufficient balance'}.
             </p>
           </div>
 
           {/* Arrow */}
-          <div className="hidden md:flex md:col-span-1 justify-center text-gray-500">
+          <div className="hidden md:flex md:col-span-1 justify-center text-content-muted">
             <ArrowRight className="w-4 h-4" />
           </div>
 
           {/* Step 2: Policy Gate Checks */}
-          <div className="md:col-span-3 bg-[#141720] p-3.5 rounded-xl border border-[#232838] space-y-1.5">
-            <span className="text-amber-400 font-semibold text-[11px] flex items-center gap-1.5">
+          <div className="md:col-span-3 bg-surface p-4 rounded-xl border border-border-subtle space-y-1.5">
+            <span className="text-brand-steel font-semibold text-[11px] flex items-center gap-1.5">
               <Lock className="w-3.5 h-3.5" /> 2. Policy Gate
             </span>
-            <div className="space-y-1 text-[11px] text-gray-300 font-sans">
+            <div className="space-y-1 text-[11px] text-content-secondary font-sans">
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-jade"></span>
                 <span>Kill switch check: PASS</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-jade"></span>
                 <span>Quiet hours (21:00-08:00): PASS</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-jade"></span>
                 <span>Contact limit cap (≤3): PASS</span>
               </div>
             </div>
           </div>
 
           {/* Arrow */}
-          <div className="hidden md:flex md:col-span-1 justify-center text-gray-500">
+          <div className="hidden md:flex md:col-span-1 justify-center text-content-muted">
             <ArrowRight className="w-4 h-4" />
           </div>
 
           {/* Step 3: Result (ALLOWED / BLOCKED) */}
-          <div className="md:col-span-2 bg-[#141720] p-3.5 rounded-xl border border-[#232838] flex flex-col items-center justify-center text-center">
+          <div className="md:col-span-2 bg-surface p-4 rounded-xl border border-border-subtle flex flex-col items-center justify-center text-center">
             {activeCase?.outcome === 'BLOCK' ? (
               <>
-                <XCircle className="w-6 h-6 text-rose-400 mb-1" />
-                <span className="text-xs font-bold text-rose-400">BLOCKED</span>
-                <span className="text-[10px] text-gray-400 mt-0.5 font-sans">Veto Enforced</span>
+                <XCircle className="w-6 h-6 text-brand-burgundy mb-1" />
+                <span className="text-xs font-bold text-brand-burgundy">BLOCKED</span>
+                <span className="text-[10px] text-content-tertiary mt-0.5 font-sans">Policy Veto</span>
               </>
             ) : (
               <>
-                <CheckCircle2 className="w-6 h-6 text-emerald-400 mb-1" />
-                <span className="text-xs font-bold text-emerald-400">ALLOWED</span>
-                <span className="text-[10px] text-gray-400 mt-0.5 font-sans">100% Safe</span>
+                <CheckCircle2 className="w-6 h-6 text-brand-jade mb-1" />
+                <span className="text-xs font-bold text-brand-jade">ALLOWED</span>
+                <span className="text-[10px] text-content-tertiary mt-0.5 font-sans">Verified Safe</span>
               </>
             )}
           </div>
@@ -139,57 +139,56 @@ export default function SystemHealth() {
       {/* Sub-Widgets Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
         {/* Quiet Hours Status */}
-        <div className="bg-[#0A0B0E] p-3.5 rounded-xl border border-[#1E222D] flex flex-col justify-between">
-          <div className="flex justify-between items-center text-gray-400">
+        <div className="bg-surface-subtle p-4 rounded-xl border border-border-subtle flex flex-col justify-between space-y-2">
+          <div className="flex justify-between items-center text-content-secondary">
             <span className="font-medium flex items-center gap-1.5">
-              <Clock className="w-3.5 h-3.5 text-sky-400" /> Quiet Hours Window
+              <Clock className="w-3.5 h-3.5 text-brand-steel" /> Quiet Hours Window
             </span>
-            <span className="text-[11px] text-gray-400">21:00 - 08:00</span>
+            <span className="text-[11px] text-content-tertiary">21:00 - 08:00</span>
           </div>
-          <div className="my-2">
-            <span className="text-xl font-bold text-white font-display">{time}</span>
+          <div className="my-1">
+            <span className="text-xl font-bold text-content-primary font-display">{time}</span>
           </div>
           <div className={`px-2.5 py-1 rounded-lg text-xs font-medium flex items-center gap-1.5 ${
-            isQuiet ? 'bg-rose-500/10 text-rose-300 border border-rose-500/20' : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+            isQuiet ? 'bg-brand-burgundy-surface text-brand-burgundy border border-brand-burgundy-border' : 'bg-brand-jade-surface text-brand-jade border border-brand-jade-border'
           }`}>
-            {isQuiet ? <ShieldAlert className="w-3.5 h-3.5 text-rose-400" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />}
-            <span>{isQuiet ? 'Outreach Suppressed' : 'Outreach Active'}</span>
+            {isQuiet ? <ShieldAlert className="w-3.5 h-3.5 text-brand-burgundy" /> : <ShieldCheck className="w-3.5 h-3.5 text-brand-jade" />}
+            <span>{isQuiet ? 'Night Outreach Suppressed' : 'Outreach Active'}</span>
           </div>
         </div>
 
         {/* Total Interventions Counter */}
-        <div className="bg-[#0A0B0E] p-3.5 rounded-xl border border-[#1E222D] flex flex-col justify-between">
-          <div className="flex justify-between items-center text-gray-400">
+        <div className="bg-surface-subtle p-4 rounded-xl border border-border-subtle flex flex-col justify-between space-y-2">
+          <div className="flex justify-between items-center text-content-secondary">
             <span className="font-medium flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-amber-400" /> Policy Interventions
+              <Shield className="w-3.5 h-3.5 text-brand-amber" /> Policy Interventions
             </span>
-            <span className="text-sm font-bold text-amber-400">{totalInterventions}</span>
+            <span className="text-sm font-bold text-brand-amber">{totalInterventions}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2 my-2 text-[11px] text-gray-400 font-sans">
-            <div>Quiet: <span className="text-white font-semibold">{quietHoursBlocks}</span></div>
-            <div>Cap (3x): <span className="text-white font-semibold">{contactCapBlocks}</span></div>
-            <div>Promises: <span className="text-white font-semibold">{promiseBlocks}</span></div>
-            <div>Refunds: <span className="text-white font-semibold">{refundEscalations}</span></div>
+          <div className="grid grid-cols-2 gap-2 my-1 text-[11px] text-content-secondary font-sans">
+            <div>Quiet: <span className="text-content-primary font-semibold">{quietHoursBlocks}</span></div>
+            <div>Cap (3x): <span className="text-content-primary font-semibold">{contactCapBlocks}</span></div>
+            <div>Promises: <span className="text-content-primary font-semibold">{promiseBlocks}</span></div>
+            <div>Refunds: <span className="text-content-primary font-semibold">{refundEscalations}</span></div>
           </div>
-          <span className="text-[10px] text-emerald-400 font-medium">
+          <span className="text-[10px] text-brand-jade font-medium">
             100% Policy Compliance Maintained
           </span>
         </div>
 
-        {/* Safety Proof Guarantee */}
-        <div className="bg-[#0A0B0E] p-3.5 rounded-xl border border-[#1E222D] flex flex-col justify-between">
-          <span className="text-gray-400 font-medium flex items-center gap-1.5">
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> Mathematical Guarantee
+        {/* Safety Proof */}
+        <div className="bg-surface-subtle p-4 rounded-xl border border-border-subtle flex flex-col justify-between space-y-2">
+          <span className="text-content-secondary font-medium flex items-center gap-1.5">
+            <CheckCircle2 className="w-3.5 h-3.5 text-brand-jade" /> Mathematical Invariant
           </span>
-          <p className="text-[11px] text-gray-300 my-2 leading-relaxed">
-            Policy rules execute after the PuLP optimizer and before any API call — making rule violations structurally impossible.
+          <p className="text-[11px] text-content-secondary my-1 leading-relaxed">
+            Policy rules execute deterministically after optimization and before dispatch — eliminating AI hallucinations.
           </p>
-          <span className="text-[10px] text-gray-400">
-            Verified by 27 invariant test cases
+          <span className="text-[10px] text-content-tertiary">
+            Verified across 27 safety invariant test suites
           </span>
         </div>
       </div>
     </div>
   );
 }
-
