@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: revora-backend
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: llama-3.1-8b-instant
+      - key: GROQ_API_KEY
+        sync: false
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: DEMO_SECRET
+        sync: false
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: MAX_CONTACTS_PER_CASE
+        value: 3
+      - key: MIN_CONTACT_GAP_HOURS
+        value: 12
+      - key: QUIET_HOURS_START
+        value: "21:00"
+      - key: QUIET_HOURS_END
+        value: "08:00"
+      - key: REFUND_SIGNOFF_THRESHOLD_PAISE
+        value: 500000
+      - key: CAPACITY_WHATSAPP
+        value: 50
+      - key: CAPACITY_HUMAN_CALL
+        value: 5
+      - key: FAIRNESS_FLOOR_SLOTS
+        value: 10
+      - key: DATABASE_PATH
+        value: ./data/recovery.db
