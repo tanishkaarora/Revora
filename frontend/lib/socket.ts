@@ -15,6 +15,8 @@ export function useWebSocketConnection() {
   const fetchResults = useAppStore((state) => state.fetchResults);
   const setComparison = useAppStore((state) => state.setComparison);
   const setEngineStatus = useAppStore((state) => state.setEngineStatus);
+  const fetchCapacityRoi = useAppStore((state) => state.fetchCapacityRoi);
+  const fetchCases = useAppStore((state) => state.fetchCases);
 
   useEffect(() => {
     let reconnectTimeoutId: any;
@@ -59,12 +61,15 @@ export function useWebSocketConnection() {
             setSimulationRunning(false);
             setLiveStage(null);
             setComparison(message.data);
+            fetchCases();
+            fetchCapacityRoi();
           } 
           
           else if (message.type === 'run_terminated') {
             setSimulationRunning(false);
             setLiveStage(null);
             fetchResults();
+            fetchCases();
           }
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error);
@@ -96,7 +101,7 @@ export function useWebSocketConnection() {
         clearTimeout(reconnectTimeoutId);
       }
     };
-  }, [updateCase, setKillSwitchActive, setSimulationRunning, setLiveStage, addAuditEntry, fetchResults, setComparison, setEngineStatus]);
+  }, [updateCase, setKillSwitchActive, setSimulationRunning, setLiveStage, addAuditEntry, fetchResults, setComparison, setEngineStatus, fetchCapacityRoi, fetchCases]);
 
   return socketRef.current;
 }

@@ -318,7 +318,7 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                 lifecycle = "CONTACTED"
                 if failure_flags["razorpay_error"]:
                     payment_link, is_degraded, err_desc = razorpay_client.create_payment_link(
-                        p.amount_paise, f"Retry payment {p.id}", "Customer", customer_contact="+910000000000"
+                        p.amount_paise, f"Retry payment {p.id}", "Customer", customer_contact="+910000000000", mock_mode=False
                     )
                     degraded = True
                     degradation_reason = f"Razorpay API Error injected: {err_desc}"
@@ -326,20 +326,19 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                     from seed.seed_data import get_customer_name
                     c_name = get_customer_name(p.customer_id)
                     payment_link, is_degraded, err_desc = razorpay_client.create_payment_link(
-                        p.amount_paise, f"Recovery link for {p.id}", c_name
+                        p.amount_paise, f"Recovery link for {p.id}", c_name, mock_mode=True
                     )
                     if is_degraded:
                         degraded = True
                         degradation_reason = err_desc
                 
-                # Only invoke LLM if the diagnosis was from the fallback classification path
-                use_llm_nudge = (diag.source == "llm_fallback")
+                # Fast template generation for high-throughput batch simulation
                 msg = conv_generator.generate_nudge(
                     customer_name=get_customer_name(p.customer_id),
                     amount_paise=p.amount_paise,
                     payment_link=payment_link,
                     cause=diag.cause,
-                    use_llm=use_llm_nudge
+                    use_llm=False
                 )
                 convo.append({
                     "sender": "bot",
@@ -350,7 +349,7 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                 lifecycle = "CONTACTED"
             elif action == "issue_refund":
                 lifecycle = "ESCALATED"
-                refund_id, is_degraded, err_desc = razorpay_client.issue_refund(f"pay_mock_{p.id}", p.amount_paise)
+                refund_id, is_degraded, err_desc = razorpay_client.issue_refund(f"pay_mock_{p.id}", p.amount_paise, mock_mode=True)
                 if is_degraded:
                     degraded = True
                     degradation_reason = err_desc

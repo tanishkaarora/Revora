@@ -306,12 +306,9 @@ export const useAppStore = create<AppState>((set, get) => ({
             const compData = await res.json();
             if (compData && compData.strategies && Object.keys(compData.strategies).length > 0) {
               set({ comparison: compData });
-              if (get().cases.length === 0 || !get().simulationRunning) {
-                await get().fetchCases();
-              }
-              if (!get().simulationRunning || pollCount > 30) {
+              if (compData.is_running === false && compData.optimized_recovered_paise > 0) {
                 clearInterval(pollInterval);
-                set({ simulationRunning: false, liveStage: null });
+                set({ simulationRunning: false, liveStage: null, comparison: compData });
                 await get().fetchCases();
                 await get().fetchCapacityRoi();
               }
@@ -320,10 +317,15 @@ export const useAppStore = create<AppState>((set, get) => ({
         } catch (e) {
           // ignore transient poll error
         }
-        if (pollCount > 40) {
+        if (pollCount > 25) {
           clearInterval(pollInterval);
+          if (get().simulationRunning) {
+            set({ simulationRunning: false, liveStage: null });
+            await get().fetchCases();
+            await get().fetchCapacityRoi();
+          }
         }
-      }, 1000);
+      }, 500);
     } catch (error: any) {
       console.error('Failed to seed batch:', error);
       set({ 

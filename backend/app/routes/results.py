@@ -47,7 +47,8 @@ def get_comparison():
         "net_value_created_paise": results_cache.net_value_created_paise,
         "contacts_avoided_count": results_cache.contacts_avoided_count,
         "policy_violations_count": 0, # Strictly 0 by architecture proof
-        "strategies": results_cache.strategies
+        "strategies": results_cache.strategies,
+        "is_running": results_cache.is_running
     }
 
 @router.get("/capacity-roi", response_model=List[CapacityROI])

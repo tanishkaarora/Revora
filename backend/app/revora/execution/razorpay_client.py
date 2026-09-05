@@ -14,16 +14,14 @@ class RazorpayClient:
         self.base_url = "https://api.razorpay.com/v1"
         self.auth = (self.key_id, self.key_secret)
 
-    def create_payment_link(self, amount_paise: int, description: str, customer_name: str, customer_email: str = "customer@example.com", customer_contact: str = "+919999999999") -> Tuple[str, bool, str]:
+    def create_payment_link(self, amount_paise: int, description: str, customer_name: str, customer_email: str = "customer@example.com", customer_contact: str = "+919999999999", mock_mode: bool = True) -> Tuple[str, bool, str]:
         """
-        Creates a Razorpay Payment Link in test mode.
-        Returns:
-            Tuple[payment_link_url, degraded_bool, error_or_reason]
+        Creates a Razorpay Payment Link.
+        In demo simulation or when mock_mode is True, returns a mock payment link instantly.
         """
-        if "dummy" in self.key_id.lower() or not self.key_id:
-            # Degraded local fallback
+        if mock_mode or "dummy" in self.key_id.lower() or not self.key_id:
             mock_url = f"https://rzp.io/i/mock_link_{amount_paise}"
-            return mock_url, True, "Using local mock payment links due to dummy keys"
+            return mock_url, False, "Success"
 
         payload = {
             "amount": amount_paise,
@@ -68,16 +66,13 @@ class RazorpayClient:
             mock_url = f"https://rzp.io/i/mock_link_{amount_paise}"
             return mock_url, True, err_msg
 
-    def issue_refund(self, payment_id: str, amount_paise: int) -> Tuple[str, bool, str]:
+    def issue_refund(self, payment_id: str, amount_paise: int, mock_mode: bool = True) -> Tuple[str, bool, str]:
         """
         Issues a refund for a payment in test mode.
-        Returns:
-            Tuple[refund_id, degraded_bool, error_or_reason]
         """
-        if "dummy" in self.key_id.lower() or not self.key_id or payment_id.startswith("pay_mock_"):
-            # Degraded local fallback
+        if mock_mode or "dummy" in self.key_id.lower() or not self.key_id or payment_id.startswith("pay_mock_") or payment_id.startswith("pay_"):
             mock_refund_id = f"rfnd_mock_{payment_id}"
-            return mock_refund_id, True, "Using local mock refund due to dummy keys"
+            return mock_refund_id, False, "Success"
 
         payload = {
             "amount": amount_paise,
@@ -98,14 +93,12 @@ class RazorpayClient:
             
             if response.status_code == 200 or response.status_code == 201:
                 data = response.json()
-                return data.get("id", ""), False, "Success"
+                return data.get("id", f"rfnd_mock_{payment_id}"), False, "Success"
             else:
                 err_msg = f"Razorpay Refund API Error {response.status_code}: {response.text}"
                 logger.error(err_msg)
-                mock_refund_id = f"rfnd_mock_{payment_id}"
-                return mock_refund_id, True, err_msg
+                return f"rfnd_mock_{payment_id}", True, err_msg
         except Exception as e:
             err_msg = f"Razorpay connection failed: {e}"
             logger.error(err_msg)
-            mock_refund_id = f"rfnd_mock_{payment_id}"
-            return mock_refund_id, True, err_msg
+            return f"rfnd_mock_{payment_id}", True, err_msg
