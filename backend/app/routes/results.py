@@ -1,5 +1,6 @@
 # backend/app/routes/results.py
 import os
+import asyncio
 from typing import List, Dict, Any
 from fastapi import APIRouter, HTTPException
 from app.routes.demo import results_cache
@@ -29,28 +30,28 @@ def get_historical_evidence():
     }
 
 @router.get("/comparison")
-def get_comparison():
+async def get_comparison():
     """
     Returns comparative recovery statistics across all strategies.
     If cached results exist, returns them; otherwise falls back to computing from stored cases.
     """
     if results_cache.optimized_recovered_paise > 0 or results_cache.is_running:
         return {
-            "optimized_recovered_paise": results_cache.optimized_recovered_paise,
-            "baseline_recovered_paise": results_cache.baseline_recovered_paise,
-            "uplift_pct": results_cache.uplift_pct,
-            "by_cause": results_cache.by_cause,
-            "total_revenue_at_risk_paise": results_cache.total_revenue_at_risk_paise,
-            "net_value_created_paise": results_cache.net_value_created_paise,
-            "contacts_avoided_count": results_cache.contacts_avoided_count,
+            "optimized_recovered_paise": int(results_cache.optimized_recovered_paise),
+            "baseline_recovered_paise": int(results_cache.baseline_recovered_paise),
+            "uplift_pct": float(results_cache.uplift_pct),
+            "by_cause": dict(results_cache.by_cause),
+            "total_revenue_at_risk_paise": int(results_cache.total_revenue_at_risk_paise),
+            "net_value_created_paise": int(results_cache.net_value_created_paise),
+            "contacts_avoided_count": int(results_cache.contacts_avoided_count),
             "policy_violations_count": 0, # Strictly 0 by architecture proof
-            "strategies": results_cache.strategies,
-            "is_running": results_cache.is_running
+            "strategies": dict(results_cache.strategies),
+            "is_running": bool(results_cache.is_running)
         }
 
     from app.audit.store import AuditStore
     store = AuditStore()
-    all_cases = store.list_cases()
+    all_cases = await asyncio.to_thread(store.list_cases)
     if all_cases:
         opt_rec = sum(c.get("amount_recovered_paise", 0) for c in all_cases if c.get("recovered"))
         total_risk = sum(c.get("amount_paise", 0) for c in all_cases)
@@ -89,20 +90,20 @@ def get_comparison():
         }
 
     return {
-        "optimized_recovered_paise": results_cache.optimized_recovered_paise,
-        "baseline_recovered_paise": results_cache.baseline_recovered_paise,
-        "uplift_pct": results_cache.uplift_pct,
-        "by_cause": results_cache.by_cause,
-        "total_revenue_at_risk_paise": results_cache.total_revenue_at_risk_paise,
-        "net_value_created_paise": results_cache.net_value_created_paise,
-        "contacts_avoided_count": results_cache.contacts_avoided_count,
+        "optimized_recovered_paise": int(results_cache.optimized_recovered_paise),
+        "baseline_recovered_paise": int(results_cache.baseline_recovered_paise),
+        "uplift_pct": float(results_cache.uplift_pct),
+        "by_cause": dict(results_cache.by_cause),
+        "total_revenue_at_risk_paise": int(results_cache.total_revenue_at_risk_paise),
+        "net_value_created_paise": int(results_cache.net_value_created_paise),
+        "contacts_avoided_count": int(results_cache.contacts_avoided_count),
         "policy_violations_count": 0,
-        "strategies": results_cache.strategies,
-        "is_running": results_cache.is_running
+        "strategies": dict(results_cache.strategies),
+        "is_running": bool(results_cache.is_running)
     }
 
 @router.get("/capacity-roi", response_model=List[CapacityROI])
-def get_capacity_roi():
+async def get_capacity_roi():
     """
     Returns the Capacity ROI (shadow prices / dual values from the LP relaxation)
     for the most recent batch run.
