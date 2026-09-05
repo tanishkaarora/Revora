@@ -549,11 +549,11 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
         results_cache.is_running = False
 
 @router.post("/seed-batch", dependencies=[Depends(verify_demo_secret)])
-def seed_batch(background_tasks: BackgroundTasks, limit: int = Query(210)):
+async def seed_batch(limit: int = Query(210)):
     store.clear_all()
     from seed.seed_data import generate_seed_payments
     payments = generate_seed_payments(count=limit)
-    background_tasks.add_task(process_batch_background, payments, 20)
+    asyncio.create_task(process_batch_background(payments, 20))
     return {"status": "started", "cases_seeded": len(payments)}
 
 
