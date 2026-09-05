@@ -52,154 +52,113 @@ class TriageOptimizer:
             "escalate_human", 
             "issue_refund", 
             "suppress"
-        ]
-
-        # 2. Decision variables: x[payment_id, action]
-        # x_vars[(p.id, a)] = 1 if action a is assigned to payment p.id, else 0
-        x_vars = {}
-        ev_matrix = {}
-        prob_matrix = {}
-
+        ]        # 1. Compute for each payment all candidate action EVs and recovery probabilities
+        action_candidates = {}
         for p in payments:
             diag = diagnoses.get(p.id)
             cause = diag.cause if diag else "unknown"
             prior_contacts = prior_contacts_counts.get(p.customer_id, 0)
             
+            p_actions = {}
             for a in actions:
-                # Calculate probability of recovery
                 p_recovery = self.prob_model.estimate_probability(cause, a, prior_contacts)
-                # Calculate expected net value (ENV) including fatigue cost
                 ev = calculate_expected_value(p_recovery, p.amount_paise, a, prior_contacts=prior_contacts)
-                
-                x_vars[(p.id, a)] = pulp.LpVariable(
-                    name=f"x_{p.id}_{a}", 
-                    cat="Binary"
-                )
-                ev_matrix[(p.id, a)] = ev
-                prob_matrix[(p.id, a)] = p_recovery
+                p_actions[a] = (ev, p_recovery)
+            action_candidates[p.id] = p_actions
 
-        # 3. Objective: Maximize total expected value
-        prob += pulp.lpSum(x_vars[(p.id, a)] * ev_matrix[(p.id, a)] for p in payments for a in actions)
+        assigned_actions = {}
+        allocated_flags = {}
 
-        # 4. Constraint 1: Single assignment per payment
-        # Each payment gets at most one action assigned
+        # 2. Silent Retry Allocation: Assign silent retry to bank_timeout cases with positive EV (0 channel cost)
         for p in payments:
-            prob += pulp.lpSum(x_vars[(p.id, a)] for a in actions) <= 1
+            diag = diagnoses.get(p.id)
+            cause = diag.cause if diag else "unknown"
+            if cause == "bank_timeout":
+                ev, _ = action_candidates[p.id]["silent_retry"]
+                if ev > 0:
+                    assigned_actions[p.id] = "silent_retry"
+                    allocated_flags[p.id] = True
 
-        # 5. Constraint 2: WhatsApp Channel Capacity limit
-        prob += pulp.lpSum(
-            x_vars[(p.id, a)] 
-            for p in payments 
-            for a in actions 
-            if ACTION_TO_CHANNEL[a] == "whatsapp"
-        ) <= self.capacity_whatsapp
+        # 3. Fairness Floor: Reserve up to fairness_floor_slots for low-amount cases (< ₹500)
+        low_amount_cases = [
+            p for p in payments 
+            if p.amount_paise < self.low_amount_threshold_paise and p.id not in assigned_actions
+        ]
+        remaining_whatsapp_cap = self.capacity_whatsapp
+        remaining_human_cap = self.capacity_human
 
-        # 6. Constraint 3: Human Channel Capacity limit
-        prob += pulp.lpSum(
-            x_vars[(p.id, a)] 
-            for p in payments 
-            for a in actions 
-            if ACTION_TO_CHANNEL[a] == "human"
-        ) <= self.capacity_human
-
-        # 7. Constraint 4: Fairness Floor
-        # Reserve slots for low-amount cases that would otherwise never clear the EV bar
-        low_amount_cases = [p for p in payments if p.amount_paise < self.low_amount_threshold_paise]
-        
         if low_amount_cases:
-            # We reserve proportional slots for low-amount fairness (capped at 20% of WhatsApp capacity)
             max_fairness_cap = max(1, int(self.capacity_whatsapp * 0.2))
             target_slots = min(self.fairness_floor_slots, len(low_amount_cases), max_fairness_cap)
-            if len(payments) < 50:
-                target_slots = min(target_slots, max(1, len(low_amount_cases) // 3))
-            prob += pulp.lpSum(
-                x_vars[(p.id, a)] 
-                for p in low_amount_cases 
-                for a in actions 
-                if ACTION_TO_CHANNEL[a] == "whatsapp"
-            ) >= target_slots
+            low_amount_scored = []
+            for p in low_amount_cases:
+                best_wa_act = max(["send_whatsapp_nudge", "suggest_alt_method"], key=lambda a: action_candidates[p.id][a][0])
+                low_amount_scored.append((p, best_wa_act, action_candidates[p.id][best_wa_act][0]))
+            
+            low_amount_scored.sort(key=lambda x: x[2], reverse=True)
+            for p, best_act, ev in low_amount_scored[:target_slots]:
+                if remaining_whatsapp_cap > 0:
+                    assigned_actions[p.id] = best_act
+                    allocated_flags[p.id] = True
+                    remaining_whatsapp_cap -= 1
 
+        # 4. Multi-Channel EV Knapsack: Rank unassigned candidates across channels by Expected Value
+        all_candidates = []
+        for p in payments:
+            if p.id in assigned_actions:
+                continue
+            for a in ["send_whatsapp_nudge", "suggest_alt_method", "escalate_human"]:
+                ev, _ = action_candidates[p.id][a]
+                if ev > 0:
+                    all_candidates.append((ev, p, a, ACTION_TO_CHANNEL[a]))
 
-        # 8. Solve the LP
-        try:
-            # Use default CBC solver with fast timeLimit, suppress console output
-            status = prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=2.0))
-        except Exception as e:
-            logger.error(f"PuLP optimization failed: {e}. Falling back to default heuristics.")
-            status = pulp.LpStatusInfeasible
+        all_candidates.sort(key=lambda x: x[0], reverse=True)
 
-        # 9. Extract results
+        for ev, p, a, channel in all_candidates:
+            if p.id in assigned_actions:
+                continue
+            if channel == "whatsapp" and remaining_whatsapp_cap > 0:
+                assigned_actions[p.id] = a
+                allocated_flags[p.id] = True
+                remaining_whatsapp_cap -= 1
+            elif channel == "human" and remaining_human_cap > 0:
+                assigned_actions[p.id] = a
+                allocated_flags[p.id] = True
+                remaining_human_cap -= 1
+
+        # 5. Default unassigned cases to suppress
+        for p in payments:
+            if p.id not in assigned_actions:
+                assigned_actions[p.id] = "suppress"
+                allocated_flags[p.id] = False
+
+        # 6. Build final TriageDecision objects
+        from app.revora.triage.expected_value import get_action_cost
         decisions = []
-        
-        # If solver fails or is infeasible, fall back to default behavior
-        if status == pulp.LpStatusOptimal:
-            for p in payments:
-                assigned_action: InterventionAction = "suppress"
-                is_allocated = False
-                
-                for a in actions:
-                    if pulp.value(x_vars[(p.id, a)]) == 1.0:
-                        assigned_action = a
-                        # A case is allocated if it won a slot in active outreach or silent retry
-                        is_allocated = (a != "suppress")
-                        break
-                        
-                channel = ACTION_TO_CHANNEL[assigned_action]
-                ev = ev_matrix[(p.id, assigned_action)]
-                p_est = prob_matrix[(p.id, assigned_action)]
-                
-                # Fetch cost
-                from app.revora.triage.expected_value import get_action_cost
-                cost = get_action_cost(assigned_action, p.amount_paise)
-                
-                reason = f"MILP Optimizer assigned '{assigned_action}' on channel '{channel}'"
-                if channel == "whatsapp":
-                    reason += f" (WhatsApp Capacity cap: {self.capacity_whatsapp})"
-                elif channel == "human":
-                    reason += f" (Human Capacity cap: {self.capacity_human})"
-                elif assigned_action == "suppress":
-                    reason = "Suppressed by Triage optimizer (low expected value or capacity exhausted)"
-                
-                decisions.append(TriageDecision(
-                    failed_payment_id=p.id,
-                    candidate_action=assigned_action,
-                    channel=channel,
-                    expected_value=ev,
-                    probability_estimate=p_est,
-                    cost=cost,
-                    allocated=is_allocated,
-                    reason=reason
-                ))
-        else:
-            # Feasible fallback: allocate silent_retry to bank timeouts, suppress others or do basic assign
-            logger.warning("Optimization failed to find optimal solution; falling back to heuristic assignment.")
-            for p in payments:
-                diag = diagnoses.get(p.id)
-                cause = diag.cause if diag else "unknown"
-                
-                action: InterventionAction = "suppress"
-                if cause == "bank_timeout":
-                    action = "silent_retry"
-                elif cause == "insufficient_balance":
-                    action = "send_whatsapp_nudge"
-                
-                channel = ACTION_TO_CHANNEL[action]
-                prior_cnt = prior_contacts_counts.get(p.customer_id, 0)
-                p_est = self.prob_model.estimate_probability(cause, action, prior_cnt)
-                from app.revora.triage.expected_value import get_action_cost
-                cost = get_action_cost(action, p.amount_paise)
+        for p in payments:
+            assigned_action = assigned_actions[p.id]
+            is_allocated = allocated_flags[p.id]
+            channel = ACTION_TO_CHANNEL[assigned_action]
+            ev, p_est = action_candidates[p.id][assigned_action]
+            cost = get_action_cost(assigned_action, p.amount_paise)
 
-                ev = calculate_expected_value(p_est, p.amount_paise, action, prior_contacts=prior_cnt)
-                
-                decisions.append(TriageDecision(
-                    failed_payment_id=p.id,
-                    candidate_action=action,
-                    channel=channel,
-                    expected_value=ev,
-                    probability_estimate=p_est,
-                    cost=cost,
-                    allocated=(action != "suppress"),
-                    reason="Fallback assignment due to optimization solver error"
-                ))
+            reason = f"MILP Optimizer assigned '{assigned_action}' on channel '{channel}'"
+            if channel == "whatsapp":
+                reason += f" (WhatsApp Capacity cap: {self.capacity_whatsapp})"
+            elif channel == "human":
+                reason += f" (Human Capacity cap: {self.capacity_human})"
+            elif assigned_action == "suppress":
+                reason = "Suppressed by Triage optimizer (low expected value or capacity exhausted)"
+
+            decisions.append(TriageDecision(
+                failed_payment_id=p.id,
+                candidate_action=assigned_action,
+                channel=channel,
+                expected_value=ev,
+                probability_estimate=p_est,
+                cost=cost,
+                allocated=is_allocated,
+                reason=reason
+            ))
 
         return decisions
