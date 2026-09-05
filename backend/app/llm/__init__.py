@@ -10,12 +10,10 @@ def get_llm_provider() -> LLMProvider:
     
     if provider_type == "groq":
         api_key = os.getenv("GROQ_API_KEY")
-        if not api_key:
-            raise ValueError(
-                "CRITICAL STARTUP ERROR: LLM_PROVIDER is set to 'groq' but GROQ_API_KEY is missing or empty. "
-                "Please configure GROQ_API_KEY in your environment/dotenv file before booting the engine."
-            )
         model = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+        if not api_key:
+            print("WARNING: Groq selected but GROQ_API_KEY is not set. Falling back to heuristic rules.")
+            return GroqProvider(api_key=None, model=model)
         return GroqProvider(api_key=api_key, model=model)
         
     if provider_type == "gemini":

@@ -16,11 +16,11 @@ from app.llm.fallback_keywords import (
 logger = logging.getLogger(__name__)
 
 class GroqProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str = "llama-3.1-8b-instant"):
+    def __init__(self, api_key: Optional[str] = None, model: str = "llama-3.1-8b-instant"):
         self.api_key = api_key
         self.model = model
         self.timeout = 3.0  # short timeout for live demo responsiveness
-        self.client = Groq(api_key=self.api_key)
+        self.client = Groq(api_key=self.api_key) if self.api_key else None
 
     def _call_groq_json(self, prompt: str, system_prompt: str = "") -> Optional[dict]:
         try:
