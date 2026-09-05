@@ -47,7 +47,7 @@
 | **Frontend Dashboard** | [https://revora-recovery.vercel.app](https://revora-recovery.vercel.app) *(Alternate: [revora-engine.vercel.app](https://revora-engine.vercel.app))* | 🟢 Live on Vercel |
 | **Backend API Engine** | [https://revora-backend-5q4x.onrender.com](https://revora-backend-5q4x.onrender.com) | 🟢 Live on Render |
 | **API Documentation** | [https://revora-backend-5q4x.onrender.com/docs](https://revora-backend-5q4x.onrender.com/docs) | 🟢 Swagger UI |
-| **Demo Pitch Video** | *[Watch Pitch Video & Walkthrough (Placeholder Link)](#)* | 🎥 Recording Available |
+| **Demo Pitch Video** | *[Watch Pitch Video & Walkthrough (https://drive.google.com/file/d/1HKgUL8auO85_CA7mgTMlr0FWQ6J6e00P/view?usp=sharing)](#)* | 🎥 Recording Available |
 
 > **Note on Render Free Tier**: The backend service spins down after inactivity. On initial visit, the first request may encounter a ~30–45s cold start delay while the instance resumes.
 
@@ -622,13 +622,13 @@ backend/tests/test_policy_engine.py::test_guardrail_blocks_during_quiet_hours PA
 
 ## 🗺️ Roadmap
 
-- [x] **Phase 1: Core Triage Engine**: PuLP MILP formulation, Expected Net Value matrix, and Beta-Binomial probability decay.
-- [x] **Phase 2: Deterministic Safety Gate**: 5-rule policy engine, quiet hours enforcement, and append-only audit trail.
-- [x] **Phase 3: Real-Time Telemetry**: WebSocket progress streaming, Next.js 14 dashboard, and Case Detail inspector.
-- [x] **Phase 4: Multilingual Execution**: Hinglish WhatsApp nudge generation and Promise-to-Pay state machine.
-- [ ] **Phase 5: Live Razorpay Webhooks**: Production webhook verification and automated payment link creation via Razorpay API.
-- [ ] **Phase 6: Multi-Tenant Merchant Auth**: RBAC and per-merchant capacity allocation policies with PostgreSQL backend.
-- [ ] **Phase 7: Dynamic Reinforcement Learning**: Contextual bandit exploration for channel yield optimization.
+-  **Phase 1: Core Triage Engine**: PuLP MILP formulation, Expected Net Value matrix, and Beta-Binomial probability decay.
+-  **Phase 2: Deterministic Safety Gate**: 5-rule policy engine, quiet hours enforcement, and append-only audit trail.
+-  **Phase 3: Real-Time Telemetry**: WebSocket progress streaming, Next.js 14 dashboard, and Case Detail inspector.
+-  **Phase 4: Multilingual Execution**: Hinglish WhatsApp nudge generation and Promise-to-Pay state machine.
+-  **Phase 5: Live Razorpay Webhooks**: Production webhook verification and automated payment link creation via Razorpay API.
+-  **Phase 6: Multi-Tenant Merchant Auth**: RBAC and per-merchant capacity allocation policies with PostgreSQL backend.
+-  **Phase 7: Dynamic Reinforcement Learning**: Contextual bandit exploration for channel yield optimization.
 
 ---
 
