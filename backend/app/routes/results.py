@@ -102,12 +102,62 @@ async def get_comparison():
         "is_running": bool(results_cache.is_running)
     }
 
+def ensure_results_cache_populated():
+    """
+    Ensures that results_cache has a valid batch populated from seed data if empty,
+    so that cold workers self-heal immediately upon invocation.
+    """
+    if results_cache.last_payments and results_cache.optimized_recovered_paise is not None and results_cache.optimized_recovered_paise > 0:
+        return
+
+    try:
+        from seed.seed_data import generate_seed_payments
+        from app.revora.diagnosis.engine import DiagnosisEngine
+        from app.revora.triage.optimizer import TriageOptimizer
+        from app.revora.triage.capacity_roi import compute_capacity_roi
+        from app.routes.demo import simulate_recovery_outcome
+
+        payments = generate_seed_payments()[:210]
+        diag_engine = DiagnosisEngine()
+        diagnoses = {p.id: diag_engine.diagnose(p) for p in payments}
+        prior_cnt = {p.customer_id: 0 for p in payments}
+
+        optimizer = TriageOptimizer()
+        opt_decisions = optimizer.allocate_batch(payments, diagnoses, prior_cnt)
+
+        # Compute baseline and optimized recovery amounts
+        opt_recovered = 0
+        for d in opt_decisions:
+            p_obj = next((p for p in payments if p.id == d.failed_payment_id), None)
+            if p_obj and d.allocated:
+                diag = diagnoses.get(p_obj.id)
+                cause_str = diag.cause if diag else "unknown"
+                rec, _ = simulate_recovery_outcome(p_obj.id, d.candidate_action, cause_str, p_obj.amount_paise, 0)
+                if rec:
+                    opt_recovered += p_obj.amount_paise
+
+        results_cache.last_payments = payments
+        results_cache.last_diagnoses = diagnoses
+        results_cache.last_prior_contacts = prior_cnt
+        results_cache.optimized_recovered_paise = opt_recovered
+
+        cap_wa = int(os.getenv("CAPACITY_WHATSAPP", "50"))
+        cap_hu = int(os.getenv("CAPACITY_HUMAN_CALL", "5"))
+        results_cache.capacity_roi = compute_capacity_roi(
+            payments, diagnoses, prior_cnt, opt_decisions, cap_wa, cap_hu
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"Could not auto-populate results_cache: {e}")
+
 @router.get("/capacity-roi", response_model=List[CapacityROI])
 async def get_capacity_roi():
     """
     Returns the Capacity ROI (shadow prices / dual values from the LP relaxation)
-    for the most recent batch run.
+    for the most recent batch run. Auto-populates from seed if cache is empty.
     """
+    ensure_results_cache_populated()
+
     if results_cache.capacity_roi:
         return results_cache.capacity_roi
 
@@ -153,11 +203,12 @@ async def get_capacity_roi():
     ]
 
 @router.post("/capacity-roi/simulate", response_model=CapacitySimulateResponse)
-def simulate_capacity(payload: CapacitySimulateRequest):
+async def simulate_capacity(payload: CapacitySimulateRequest):
     """
     Simulates changing a channel's daily capacity limit.
     - Perturbations <= 20%: uses instant shadow price linear approximation.
     - Perturbations > 20%: reruns the full MILP solver with the new capacity.
+    Auto-populates cache if worker is cold, or returns a clear structured error.
     """
     if payload.channel not in ["whatsapp", "human"]:
         raise HTTPException(status_code=400, detail=f"Unsupported channel '{payload.channel}'. Supported: whatsapp, human")
@@ -165,14 +216,25 @@ def simulate_capacity(payload: CapacitySimulateRequest):
     if payload.new_capacity < 0:
         raise HTTPException(status_code=400, detail="Capacity must be non-negative")
 
-    current_roi = get_capacity_roi()
+    # Step 1: Self-heal cache if empty/cold
+    ensure_results_cache_populated()
+
+    # Step 2: Explicit guard if cache still cannot be populated
+    if not results_cache.last_payments or results_cache.optimized_recovered_paise is None:
+        raise HTTPException(
+            status_code=400, 
+            detail="No recovery batch has been run yet — please click 'Run Recovery' on the dashboard first."
+        )
+
+    current_roi = await get_capacity_roi()
+    base_recovered = int(results_cache.optimized_recovered_paise or 0)
 
     return simulate_capacity_shift(
         channel=payload.channel,
         new_capacity=payload.new_capacity,
         current_capacity_roi=current_roi,
-        payments=results_cache.last_payments,
-        diagnoses=results_cache.last_diagnoses,
-        prior_contacts_counts=results_cache.last_prior_contacts,
-        base_recovered_paise=results_cache.optimized_recovered_paise
+        payments=results_cache.last_payments or [],
+        diagnoses=results_cache.last_diagnoses or {},
+        prior_contacts_counts=results_cache.last_prior_contacts or {},
+        base_recovered_paise=base_recovered
     )

@@ -240,10 +240,12 @@ export const useAppStore = create<AppState>((set, get) => ({
         const data: CapacitySimulateResponse = await response.json();
         return data;
       }
-      return null;
+      const errData = await response.json().catch(() => null);
+      const errMsg = errData?.detail || `Simulation request failed (${response.status})`;
+      throw new Error(errMsg);
     } catch (error) {
       console.error('Failed to simulate capacity:', error);
-      return null;
+      throw error;
     }
   },
 

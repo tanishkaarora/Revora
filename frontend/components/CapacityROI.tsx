@@ -53,7 +53,7 @@ export default function CapacityROI() {
           setSimError('Simulation request returned empty response.');
         }
       } catch (err: any) {
-        setSimError(`Failed to simulate capacity: ${err?.message || 'Check backend connection'}`);
+        setSimError(err?.message || 'Failed to simulate capacity. Please check backend connection.');
       } finally {
         setIsSimulating(false);
       }

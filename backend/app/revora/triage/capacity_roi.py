@@ -234,6 +234,8 @@ def simulate_capacity_shift(
     pct_change = abs(delta) / max(1, curr_cap)
     is_small_change = pct_change <= 0.20
 
+    safe_base_recovered = int(base_recovered_paise or 0)
+
     if is_small_change or not payments:
         # Linear approximation path
         if not roi_item or not roi_item.is_binding:
@@ -245,7 +247,7 @@ def simulate_capacity_shift(
         else:
             projected_gain = int(delta * shadow_price)
 
-        projected_total = max(0, base_recovered_paise + projected_gain)
+        projected_total = max(0, safe_base_recovered + projected_gain)
         explanation = (
             f"Instant dual-value linear approximation: applied marginal shadow price "
             f"₹{(shadow_price/100):.2f}/slot across Δ{delta:+d} slots (within ±20% threshold)."
@@ -275,7 +277,6 @@ def simulate_capacity_shift(
         from app.routes.demo import simulate_recovery_outcome
         simulated_recovered_paise = 0
         for d in new_decisions:
-
             p_obj = next((p for p in payments if p.id == d.failed_payment_id), None)
             if p_obj and d.allocated:
                 diag = diagnoses.get(p_obj.id)
@@ -285,9 +286,7 @@ def simulate_capacity_shift(
                 if recovered:
                     simulated_recovered_paise += p_obj.amount_paise
 
-
-
-        projected_gain = simulated_recovered_paise - base_recovered_paise
+        projected_gain = int(simulated_recovered_paise) - safe_base_recovered
         explanation = (
             f"Full MILP re-optimization executed: re-solved integer solver for new "
             f"capacity of {new_capacity} slots (|Δ| > 20% threshold)."
@@ -298,8 +297,9 @@ def simulate_capacity_shift(
             new_capacity=new_capacity,
             delta=delta,
             is_linear_approximation=False,
-            projected_recovered_paise=simulated_recovered_paise,
+            projected_recovered_paise=int(simulated_recovered_paise),
             projected_gain_paise=projected_gain,
             shadow_price_per_unit=shadow_price,
             explanation=explanation
         )
+
