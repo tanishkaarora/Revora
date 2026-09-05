@@ -31,6 +31,8 @@ class AuditStore:
     def init_db(self):
         with self.get_connection() as conn:
             cursor = conn.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL;")
+            cursor.execute("PRAGMA busy_timeout=5000;")
             cursor.execute(CREATE_AUDIT_LOG_TABLE)
             cursor.execute(CREATE_INDEX_AUDIT_CUSTOMER)
             cursor.execute(CREATE_INDEX_AUDIT_PAYMENT)
