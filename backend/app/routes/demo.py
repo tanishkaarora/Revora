@@ -186,20 +186,23 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
             }
         })
 
-        # 2. Pre-diagnose all payments
-        diagnoses = {}
-        for p in payments:
-            if failure_flags["llm_timeout"]:
-                p_diag = diagnosis_engine.diagnose(
-                    FailedPayment(
-                        id=p.id, customer_id=p.customer_id, amount_paise=p.amount_paise,
-                        method=p.method, error_code="LLM_INJECTED_TIMEOUT", error_reason="Timeout failure injected",
-                        timestamp=p.timestamp
+        # 2. Pre-diagnose all payments in thread worker to avoid blocking event loop
+        def _run_all_diagnoses():
+            d_map = {}
+            for p in payments:
+                if failure_flags["llm_timeout"]:
+                    d_map[p.id] = diagnosis_engine.diagnose(
+                        FailedPayment(
+                            id=p.id, customer_id=p.customer_id, amount_paise=p.amount_paise,
+                            method=p.method, error_code="LLM_INJECTED_TIMEOUT", error_reason="Timeout failure injected",
+                            timestamp=p.timestamp
+                        )
                     )
-                )
-            else:
-                p_diag = diagnosis_engine.diagnose(p)
-            diagnoses[p.id] = p_diag
+                else:
+                    d_map[p.id] = diagnosis_engine.diagnose(p)
+            return d_map
+
+        diagnoses = await asyncio.to_thread(_run_all_diagnoses)
 
         # Initial prior contacts count
         prior_contacts = {p.customer_id: 0 for p in payments}
@@ -417,9 +420,9 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
             if i < 25 or i % 5 == 0 or recovered:
                 await manager.broadcast_audit_entry(case_data)
 
-            # Broadcast progress updates efficiently
+            # Broadcast progress updates smoothly across all cases
             completed_count = i + 1
-            if completed_count % 15 == 0 or completed_count == total_cases:
+            if completed_count % 5 == 0 or completed_count == total_cases:
                 progress_percentage = max(6, min(100, int((completed_count / total_cases) * 100)))
                 await manager.broadcast({
                     "type": "stage_update",
@@ -431,7 +434,7 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                         "description": f"Evaluating policy & executing ({completed_count}/{total_cases}) · {lifecycle}"
                     }
                 })
-                await asyncio.sleep(0.001)
+                await asyncio.sleep(0.015)
 
             # --- Evaluate Baselines Parallel ---
             # 1. FCFS
