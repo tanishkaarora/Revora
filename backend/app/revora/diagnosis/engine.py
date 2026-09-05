@@ -22,7 +22,19 @@ class DiagnosisEngine:
                 evidence={"matched_code": payment.error_code, "matched_reason": payment.error_reason}
             )
             
-        # Step 2: Fallback to LLM
+        # Step 2: Fast keyword classification
+        from app.llm.fallback_keywords import fallback_classify_failure_cause
+        fb_cause, fb_conf = fallback_classify_failure_cause(payment.error_code, payment.error_reason)
+        if fb_cause != "unknown":
+            return Diagnosis(
+                failed_payment_id=payment.id,
+                cause=fb_cause,
+                confidence=fb_conf,
+                source="rule",
+                evidence={"keyword_matched": True}
+            )
+
+        # Step 3: Fallback to LLM
         try:
             llm_cause, llm_confidence = self.llm_provider.classify_failure_cause(
                 payment.error_code, payment.error_reason

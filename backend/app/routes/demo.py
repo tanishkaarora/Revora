@@ -143,417 +143,408 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
     results_cache.is_running = True
     total_cases = len(payments)
     
-    # Broadcast Stage 1: Ingesting
-    await manager.broadcast({
-        "type": "stage_update",
-        "data": {
-            "stage": "Ingesting", 
-            "progress": 2, 
-            "completed": 0,
-            "total": total_cases,
-            "description": f"Ingesting {total_cases} payment failure webhook events"
-        }
-    })
-    
-    total_revenue_at_risk = sum(p.amount_paise for p in payments)
-    results_cache.total_revenue_at_risk_paise = total_revenue_at_risk
+    try:
+        # Broadcast Stage 1: Ingesting
+        await manager.broadcast({
+            "type": "stage_update",
+            "data": {
+                "stage": "Ingesting", 
+                "progress": 2, 
+                "completed": 0,
+                "total": total_cases,
+                "description": f"Ingesting {total_cases} payment failure webhook events"
+            }
+        })
+        
+        total_revenue_at_risk = sum(p.amount_paise for p in payments)
+        results_cache.total_revenue_at_risk_paise = total_revenue_at_risk
 
-    # 1. Reset metrics
-    opt_recovered = 0
-    opt_costs = 0
-    opt_fatigue_costs = 0
-    cause_breakdown = {}
+        # 1. Reset metrics
+        opt_recovered = 0
+        opt_costs = 0
+        opt_fatigue_costs = 0
+        cause_breakdown = {}
 
-    from seed.seed_data import FAILURE_REASONS
-    for cause in FAILURE_REASONS.keys():
-        cause_breakdown[cause] = {
+        from seed.seed_data import FAILURE_REASONS
+        for cause in FAILURE_REASONS.keys():
+            cause_breakdown[cause] = {
+                "optimized": 0, "fcfs": 0, "highest_amount": 0, "highest_probability": 0
+            }
+        cause_breakdown["unknown"] = {
             "optimized": 0, "fcfs": 0, "highest_amount": 0, "highest_probability": 0
         }
-    cause_breakdown["unknown"] = {
-        "optimized": 0, "fcfs": 0, "highest_amount": 0, "highest_probability": 0
-    }
 
-    # Broadcast Stage 2: Diagnosing
-    await manager.broadcast({
-        "type": "stage_update",
-        "data": {
-            "stage": "Diagnosing", 
-            "progress": 4, 
-            "completed": 0,
-            "total": total_cases,
-            "description": "Classifying root failure causes via rule engine (with LLM fallback)"
-        }
-    })
+        # Broadcast Stage 2: Diagnosing
+        await manager.broadcast({
+            "type": "stage_update",
+            "data": {
+                "stage": "Diagnosing", 
+                "progress": 4, 
+                "completed": 0,
+                "total": total_cases,
+                "description": "Classifying root failure causes via rule engine (with LLM fallback)"
+            }
+        })
 
-    # 2. Pre-diagnose all payments
-    diagnoses = {}
-    for p in payments:
-        if failure_flags["llm_timeout"]:
-            p_diag = diagnosis_engine.diagnose(
-                FailedPayment(
-                    id=p.id, customer_id=p.customer_id, amount_paise=p.amount_paise,
-                    method=p.method, error_code="LLM_INJECTED_TIMEOUT", error_reason="Timeout failure injected",
-                    timestamp=p.timestamp
+        # 2. Pre-diagnose all payments
+        diagnoses = {}
+        for p in payments:
+            if failure_flags["llm_timeout"]:
+                p_diag = diagnosis_engine.diagnose(
+                    FailedPayment(
+                        id=p.id, customer_id=p.customer_id, amount_paise=p.amount_paise,
+                        method=p.method, error_code="LLM_INJECTED_TIMEOUT", error_reason="Timeout failure injected",
+                        timestamp=p.timestamp
+                    )
                 )
+            else:
+                p_diag = diagnosis_engine.diagnose(p)
+            diagnoses[p.id] = p_diag
+
+        # Initial prior contacts count
+        prior_contacts = {p.customer_id: 0 for p in payments}
+
+        # Broadcast Stage 3 & 4: Scoring & Optimizing
+        await manager.broadcast({
+            "type": "stage_update",
+            "data": {
+                "stage": "Scoring & Optimizing", 
+                "progress": 6, 
+                "completed": 0,
+                "total": total_cases,
+                "description": "Computing Bayesian recovery probabilities and solving PuLP MILP"
+            }
+        })
+
+        # 3. Solve optimization (Triage)
+        opt_decisions = optimizer.allocate_batch(payments, diagnoses, prior_contacts)
+        opt_decisions_map = {d.failed_payment_id: d for d in opt_decisions}
+
+        # Store batch references and compute Capacity ROI (LP relaxation shadow prices)
+        results_cache.last_payments = payments
+        results_cache.last_diagnoses = diagnoses
+        results_cache.last_prior_contacts = prior_contacts
+
+        try:
+            from app.revora.triage.capacity_roi import compute_capacity_roi
+
+            results_cache.capacity_roi = compute_capacity_roi(
+                payments=payments,
+                diagnoses=diagnoses,
+                prior_contacts_counts=prior_contacts,
+                milp_decisions=opt_decisions,
+                capacity_whatsapp=optimizer.capacity_whatsapp,
+                capacity_human=optimizer.capacity_human,
+                fairness_floor_slots=optimizer.fairness_floor_slots
             )
-        else:
-            p_diag = diagnosis_engine.diagnose(p)
-        diagnoses[p.id] = p_diag
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"Capacity ROI computation error: {e}")
 
-    # Get contact counts for prior history
-    prior_contacts = {}
-    for p in payments:
-        prior_contacts[p.customer_id] = store.get_recent_contacts_count(p.customer_id)
+        # 4. Run Baseline allocations for multi-baseline comparison
+        fcfs_decisions = baseline_triage.allocate_batch_fcfs(payments, diagnoses, prior_contacts)
+        fcfs_map = {d.failed_payment_id: d for d in fcfs_decisions}
 
-    # Broadcast Stage 3 & 4: Scoring & Optimizing
-    await manager.broadcast({
-        "type": "stage_update",
-        "data": {
-            "stage": "Scoring & Optimizing", 
-            "progress": 6, 
-            "completed": 0,
-            "total": total_cases,
-            "description": "Computing Bayesian recovery probabilities and solving PuLP MILP"
-        }
-    })
+        ha_decisions = baseline_triage.allocate_batch_highest_amount(payments, diagnoses, prior_contacts)
+        ha_map = {d.failed_payment_id: d for d in ha_decisions}
 
-    # 3. Solve optimization (Triage)
-    opt_decisions = optimizer.allocate_batch(payments, diagnoses, prior_contacts)
-    opt_decisions_map = {d.failed_payment_id: d for d in opt_decisions}
+        hp_decisions = baseline_triage.allocate_batch_highest_prob(payments, diagnoses, prior_contacts)
+        hp_map = {d.failed_payment_id: d for d in hp_decisions}
 
-    # Store batch references and compute Capacity ROI (LP relaxation shadow prices)
-    results_cache.last_payments = payments
-    results_cache.last_diagnoses = diagnoses
-    results_cache.last_prior_contacts = prior_contacts
+        # Baseline tracking
+        fcfs_recovered = 0
+        fcfs_costs = 0
+        ha_recovered = 0
+        ha_costs = 0
+        hp_recovered = 0
+        hp_costs = 0
 
-    try:
-        from app.revora.triage.capacity_roi import compute_capacity_roi
+        # 5. Process and Broadcast Cases one-by-one with Continuous Progress Updates
+        policy_engine = PolicyEngine(store)
+        batch_outcomes_records = []
+        contacts_avoided = 0
 
-        results_cache.capacity_roi = compute_capacity_roi(
-            payments=payments,
-            diagnoses=diagnoses,
-            prior_contacts_counts=prior_contacts,
-            milp_decisions=opt_decisions,
-            capacity_whatsapp=optimizer.capacity_whatsapp,
-            capacity_human=optimizer.capacity_human,
-            fairness_floor_slots=optimizer.fairness_floor_slots
-        )
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"Capacity ROI computation error: {e}")
+        batch_cases_to_save = []
+        for i, p in enumerate(payments):
+            if kill_switch.is_active():
+                await manager.broadcast({
+                    "type": "run_terminated",
+                    "reason": "Kill switch activated mid-run"
+                })
+                return
 
-    # 4. Run Baseline allocations for multi-baseline comparison
-    fcfs_decisions = baseline_triage.allocate_batch_fcfs(payments, diagnoses, prior_contacts)
-    fcfs_map = {d.failed_payment_id: d for d in fcfs_decisions}
+            opt_dec = opt_decisions_map.get(p.id)
+            diag = diagnoses[p.id]
+            prior_cnt = prior_contacts.get(p.customer_id, 0)
 
-    ha_decisions = baseline_triage.allocate_batch_highest_amount(payments, diagnoses, prior_contacts)
-    ha_map = {d.failed_payment_id: d for d in ha_decisions}
+            # Check for degradation injection
+            degraded = False
+            degradation_reason = None
+            if failure_flags["llm_timeout"] or failure_flags["razorpay_error"]:
+                degraded = True
+                degradation_reason = "Manual failure injection active: LLM timeout / Razorpay Error simulated."
 
-    hp_decisions = baseline_triage.allocate_batch_highest_prob(payments, diagnoses, prior_contacts)
-    hp_map = {d.failed_payment_id: d for d in hp_decisions}
+            # Evaluate Guardrail policy on optimized decision
+            guard_dec = policy_engine.evaluate(p, opt_dec)
 
-    # Baseline tracking
-    fcfs_recovered = 0
-    fcfs_costs = 0
-    ha_recovered = 0
-    ha_costs = 0
-    hp_recovered = 0
-    hp_costs = 0
+            rec_outcome = None
+            convo = []
+            payment_link = ""
+            lifecycle: LifecycleState = "PRIORITIZED"
 
-    # 5. Process and Broadcast Cases one-by-one with Continuous Progress Updates
-    policy_engine = PolicyEngine(store)
-    batch_outcomes_records = []
-    contacts_avoided = 0
+            if guard_dec.outcome == "BLOCK":
+                lifecycle = "SUPPRESSED"
+                contacts_avoided += 1
+            elif guard_dec.outcome == "ESCALATE":
+                lifecycle = "ESCALATED"
+            elif not opt_dec.allocated or opt_dec.candidate_action == "suppress":
+                lifecycle = "SUPPRESSED"
+                contacts_avoided += 1
+            elif guard_dec.outcome == "ALLOW":
+                action = opt_dec.candidate_action
+                
+                # Action cost and fatigue cost
+                direct_cost = get_action_cost(action, p.amount_paise)
+                fatigue_c = get_fatigue_cost(action, prior_cnt)
+                opt_costs += direct_cost
+                opt_fatigue_costs += fatigue_c
 
-    batch_cases_to_save = []
-    for i, p in enumerate(payments):
-        if kill_switch.is_active():
-            results_cache.is_running = False
-            await manager.broadcast({
-                "type": "run_terminated",
-                "reason": "Kill switch activated mid-run"
-            })
-            return
-
-        opt_dec = opt_decisions_map.get(p.id)
-        diag = diagnoses[p.id]
-        prior_cnt = prior_contacts.get(p.customer_id, 0)
-
-        # Check for degradation injection
-        degraded = False
-        degradation_reason = None
-        if failure_flags["llm_timeout"] or failure_flags["razorpay_error"]:
-            degraded = True
-            degradation_reason = "Manual failure injection active: LLM timeout / Razorpay Error simulated."
-
-        # Evaluate Guardrail policy on optimized decision
-        guard_dec = policy_engine.evaluate(p, opt_dec)
-
-        rec_outcome = None
-        convo = []
-        payment_link = ""
-        lifecycle: LifecycleState = "PRIORITIZED"
-
-        if guard_dec.outcome == "BLOCK":
-            lifecycle = "SUPPRESSED"
-            contacts_avoided += 1
-        elif guard_dec.outcome == "ESCALATE":
-            lifecycle = "ESCALATED"
-        elif not opt_dec.allocated or opt_dec.candidate_action == "suppress":
-            lifecycle = "SUPPRESSED"
-            contacts_avoided += 1
-        elif guard_dec.outcome == "ALLOW":
-            action = opt_dec.candidate_action
-            
-            # Action cost and fatigue cost
-            direct_cost = get_action_cost(action, p.amount_paise)
-            fatigue_c = get_fatigue_cost(action, prior_cnt)
-            opt_costs += direct_cost
-            opt_fatigue_costs += fatigue_c
-
-            if action == "silent_retry":
-                lifecycle = "RETRY"
-                payment_link = "N/A"
-            elif action in ["send_whatsapp_nudge", "suggest_alt_method"]:
-                lifecycle = "CONTACTED"
-                if failure_flags["razorpay_error"]:
-                    payment_link, is_degraded, err_desc = razorpay_client.create_payment_link(
-                        p.amount_paise, f"Retry payment {p.id}", "Customer", customer_contact="+910000000000", mock_mode=False
+                if action == "silent_retry":
+                    lifecycle = "RETRY"
+                    payment_link = "N/A"
+                elif action in ["send_whatsapp_nudge", "suggest_alt_method"]:
+                    lifecycle = "CONTACTED"
+                    if failure_flags["razorpay_error"]:
+                        payment_link, is_degraded, err_desc = razorpay_client.create_payment_link(
+                            p.amount_paise, f"Retry payment {p.id}", "Customer", customer_contact="+910000000000", mock_mode=False
+                        )
+                        degraded = True
+                        degradation_reason = f"Razorpay API Error injected: {err_desc}"
+                    else:
+                        from seed.seed_data import get_customer_name
+                        c_name = get_customer_name(p.customer_id)
+                        payment_link, is_degraded, err_desc = razorpay_client.create_payment_link(
+                            p.amount_paise, f"Recovery link for {p.id}", c_name, mock_mode=True
+                        )
+                        if is_degraded:
+                            degraded = True
+                            degradation_reason = err_desc
+                    
+                    # Fast template generation for high-throughput batch simulation
+                    msg = conv_generator.generate_nudge(
+                        customer_name=get_customer_name(p.customer_id),
+                        amount_paise=p.amount_paise,
+                        payment_link=payment_link,
+                        cause=diag.cause,
+                        use_llm=False
                     )
-                    degraded = True
-                    degradation_reason = f"Razorpay API Error injected: {err_desc}"
-                else:
-                    from seed.seed_data import get_customer_name
-                    c_name = get_customer_name(p.customer_id)
-                    payment_link, is_degraded, err_desc = razorpay_client.create_payment_link(
-                        p.amount_paise, f"Recovery link for {p.id}", c_name, mock_mode=True
-                    )
+                    convo.append({
+                        "sender": "bot",
+                        "text": msg,
+                        "timestamp": datetime.now().isoformat()
+                    })
+                elif action == "escalate_human":
+                    lifecycle = "CONTACTED"
+                elif action == "issue_refund":
+                    lifecycle = "ESCALATED"
+                    refund_id, is_degraded, err_desc = razorpay_client.issue_refund(f"pay_mock_{p.id}", p.amount_paise, mock_mode=True)
                     if is_degraded:
                         degraded = True
                         degradation_reason = err_desc
-                
-                # Fast template generation for high-throughput batch simulation
-                msg = conv_generator.generate_nudge(
-                    customer_name=get_customer_name(p.customer_id),
-                    amount_paise=p.amount_paise,
-                    payment_link=payment_link,
-                    cause=diag.cause,
-                    use_llm=False
-                )
-                convo.append({
-                    "sender": "bot",
-                    "text": msg,
-                    "timestamp": datetime.now().isoformat()
+
+                # Simulate recovery outcome using independent perturbed model
+                recovered, amt_factor = simulate_recovery_outcome(p.id, action, diag.cause, p.amount_paise, prior_cnt)
+                if recovered:
+                    lifecycle = "RECOVERED"
+                    recovered_amt = p.amount_paise
+                    opt_recovered += recovered_amt
+                    cause_breakdown[diag.cause]["optimized"] += recovered_amt
+                    
+                    rec_outcome = RecoveryOutcome(
+                        failed_payment_id=p.id,
+                        recovered=True,
+                        amount_recovered_paise=recovered_amt,
+                        cause=diag.cause
+                    )
+                    
+                    if convo:
+                        convo.append({
+                            "sender": "system",
+                            "text": f"Payment of ₹{recovered_amt/100.0:.2f} successfully recovered.",
+                            "timestamp": datetime.now().isoformat()
+                        })
+
+                batch_outcomes_records.append({
+                    "cause": diag.cause,
+                    "action": action,
+                    "recovered": 1 if recovered else 0
                 })
-            elif action == "escalate_human":
-                lifecycle = "CONTACTED"
-            elif action == "issue_refund":
-                lifecycle = "ESCALATED"
-                refund_id, is_degraded, err_desc = razorpay_client.issue_refund(f"pay_mock_{p.id}", p.amount_paise, mock_mode=True)
-                if is_degraded:
-                    degraded = True
-                    degradation_reason = err_desc
 
-            # Simulate recovery outcome using independent perturbed model
-            recovered, amt_factor = simulate_recovery_outcome(p.id, action, diag.cause, p.amount_paise, prior_cnt)
-            if recovered:
-                lifecycle = "RECOVERED"
-                recovered_amt = p.amount_paise
-                opt_recovered += recovered_amt
-                cause_breakdown[diag.cause]["optimized"] += recovered_amt
-                
-                rec_outcome = RecoveryOutcome(
-                    failed_payment_id=p.id,
-                    recovered=True,
-                    amount_recovered_paise=recovered_amt,
-                    cause=diag.cause
-                )
-                
-                tracker = PromiseTracker(store)
-                tracker.mark_promise_kept(p.customer_id)
-                
-                if convo:
-                    convo.append({
-                        "sender": "system",
-                        "text": f"Payment of ₹{recovered_amt/100.0:.2f} successfully recovered.",
-                        "timestamp": datetime.now().isoformat()
-                    })
-
-            batch_outcomes_records.append({
+            # Build case data
+            from seed.seed_data import get_customer_name
+            case_data = {
+                "id": p.id,
+                "customer_id": p.customer_id,
+                "customer_name": get_customer_name(p.customer_id),
+                "amount_paise": p.amount_paise,
+                "method": p.method,
+                "error_code": p.error_code,
+                "error_reason": p.error_reason,
+                "timestamp": p.timestamp,
                 "cause": diag.cause,
-                "action": action,
-                "recovered": 1 if recovered else 0
-            })
+                "diagnosis_confidence": diag.confidence,
+                "diagnosis_source": diag.source,
+                "evidence_json": json.dumps(diag.evidence),
+                "candidate_action": opt_dec.candidate_action,
+                "channel": opt_dec.channel,
+                "expected_value": opt_dec.expected_value,
+                "probability_estimate": opt_dec.probability_estimate,
+                "cost": opt_dec.cost,
+                "allocated": opt_dec.allocated,
+                "triage_reason": opt_dec.reason,
+                "outcome": guard_dec.outcome,
+                "rule_fired": guard_dec.rule_fired,
+                "guardrail_reason": guard_dec.reason,
+                "lifecycle_state": lifecycle,
+                "recovered": rec_outcome.recovered if rec_outcome else False,
+                "amount_recovered_paise": rec_outcome.amount_recovered_paise if rec_outcome else 0,
+                "conversation_json": json.dumps(convo) if convo else "[]",
+                "degraded": degraded,
+                "degradation_reason": degradation_reason
+            }
+            batch_cases_to_save.append(case_data)
+            await manager.broadcast_audit_entry(case_data)
 
-        # Build case data
-        from seed.seed_data import get_customer_name
-        case_data = {
-            "id": p.id,
-            "customer_id": p.customer_id,
-            "customer_name": get_customer_name(p.customer_id),
-            "amount_paise": p.amount_paise,
-            "method": p.method,
-            "error_code": p.error_code,
-            "error_reason": p.error_reason,
-            "timestamp": p.timestamp,
-            "cause": diag.cause,
-            "diagnosis_confidence": diag.confidence,
-            "diagnosis_source": diag.source,
-            "evidence_json": json.dumps(diag.evidence),
-            "candidate_action": opt_dec.candidate_action,
-            "channel": opt_dec.channel,
-            "expected_value": opt_dec.expected_value,
-            "probability_estimate": opt_dec.probability_estimate,
-            "cost": opt_dec.cost,
-            "allocated": opt_dec.allocated,
-            "triage_reason": opt_dec.reason,
-            "outcome": guard_dec.outcome,
-            "rule_fired": guard_dec.rule_fired,
-            "guardrail_reason": guard_dec.reason,
-            "lifecycle_state": lifecycle,
-            "recovered": rec_outcome.recovered if rec_outcome else False,
-            "amount_recovered_paise": rec_outcome.amount_recovered_paise if rec_outcome else 0,
-            "conversation_json": json.dumps(convo) if convo else "[]",
-            "degraded": degraded,
-            "degradation_reason": degradation_reason
+            # Broadcast progress updates efficiently
+            completed_count = i + 1
+            if completed_count % 15 == 0 or completed_count == total_cases:
+                progress_percentage = max(6, min(100, int((completed_count / total_cases) * 100)))
+                await manager.broadcast({
+                    "type": "stage_update",
+                    "data": {
+                        "stage": "Guardrail & Execution",
+                        "progress": progress_percentage,
+                        "completed": completed_count,
+                        "total": total_cases,
+                        "description": f"Evaluating policy & executing ({completed_count}/{total_cases}) · {lifecycle}"
+                    }
+                })
+                await asyncio.sleep(0.001)
+
+            # --- Evaluate Baselines Parallel ---
+            # 1. FCFS
+            fcfs_dec = fcfs_map.get(p.id)
+            fcfs_guard = policy_engine.evaluate(p, fcfs_dec)
+            if fcfs_guard.outcome == "ALLOW" and fcfs_dec.allocated:
+                fcfs_costs += get_action_cost(fcfs_dec.candidate_action, p.amount_paise)
+                fcfs_rec, _ = simulate_recovery_outcome(p.id, fcfs_dec.candidate_action, diag.cause, p.amount_paise, prior_cnt)
+                if fcfs_rec:
+                    fcfs_recovered += p.amount_paise
+                    cause_breakdown[diag.cause]["fcfs"] += p.amount_paise
+
+            # 2. Highest Amount First
+            ha_dec = ha_map.get(p.id)
+            ha_guard = policy_engine.evaluate(p, ha_dec)
+            if ha_guard.outcome == "ALLOW" and ha_dec.allocated:
+                ha_costs += get_action_cost(ha_dec.candidate_action, p.amount_paise)
+                ha_rec, _ = simulate_recovery_outcome(p.id, ha_dec.candidate_action, diag.cause, p.amount_paise, prior_cnt)
+                if ha_rec:
+                    ha_recovered += p.amount_paise
+                    cause_breakdown[diag.cause]["highest_amount"] += p.amount_paise
+
+            # 3. Highest Probability First
+            hp_dec = hp_map.get(p.id)
+            hp_guard = policy_engine.evaluate(p, hp_dec)
+            if hp_guard.outcome == "ALLOW" and hp_dec.allocated:
+                hp_costs += get_action_cost(hp_dec.candidate_action, p.amount_paise)
+                hp_rec, _ = simulate_recovery_outcome(p.id, hp_dec.candidate_action, diag.cause, p.amount_paise, prior_cnt)
+                if hp_rec:
+                    hp_recovered += p.amount_paise
+                    cause_breakdown[diag.cause]["highest_probability"] += p.amount_paise
+
+        # Save all cases to store in single fast transaction
+        store.upsert_cases_batch(batch_cases_to_save)
+
+        # 6. Finalize comparative stats
+        results_cache.optimized_recovered_paise = opt_recovered
+        results_cache.baseline_recovered_paise = fcfs_recovered
+        results_cache.last_outcomes = batch_outcomes_records
+        results_cache.contacts_avoided_count = contacts_avoided
+        results_cache.total_revenue_at_risk_paise = total_revenue_at_risk
+        
+        net_opt = opt_recovered - (opt_costs + opt_fatigue_costs)
+        net_fcfs = fcfs_recovered - fcfs_costs
+        results_cache.net_value_created_paise = max(0, net_opt - net_fcfs)
+
+        def calc_uplift(opt_val: int, base_val: int) -> float:
+            if base_val > 0:
+                return round(((opt_val - base_val) / base_val) * 100.0, 1)
+            elif opt_val > 0:
+                return 100.0
+            return 0.0
+
+        uplift_fcfs = calc_uplift(opt_recovered, fcfs_recovered)
+        uplift_ha = calc_uplift(opt_recovered, ha_recovered)
+        uplift_hp = calc_uplift(opt_recovered, hp_recovered)
+
+        results_cache.uplift_pct = uplift_fcfs
+        results_cache.by_cause = cause_breakdown
+
+        results_cache.strategies = {
+            "optimized": {
+                "name": "PuLP MILP Optimizer",
+                "recovered_paise": opt_recovered,
+                "total_cost_paise": opt_costs + opt_fatigue_costs,
+                "net_value_paise": opt_recovered - (opt_costs + opt_fatigue_costs),
+                "uplift_pct_vs_fcfs": uplift_fcfs
+            },
+            "fcfs": {
+                "name": "First-Come First-Served (FCFS)",
+                "recovered_paise": fcfs_recovered,
+                "total_cost_paise": fcfs_costs,
+                "net_value_paise": fcfs_recovered - fcfs_costs,
+                "uplift_pct_vs_fcfs": 0.0
+            },
+            "highest_amount": {
+                "name": "Highest Amount First",
+                "recovered_paise": ha_recovered,
+                "total_cost_paise": ha_costs,
+                "net_value_paise": ha_recovered - ha_costs,
+                "uplift_pct": uplift_ha
+            },
+            "highest_probability": {
+                "name": "Highest Probability First",
+                "recovered_paise": hp_recovered,
+                "total_cost_paise": hp_costs,
+                "net_value_paise": hp_recovered - hp_costs,
+                "uplift_pct": uplift_hp
+            }
         }
-        batch_cases_to_save.append(case_data)
-        await manager.broadcast_audit_entry(case_data)
 
-        # Broadcast progress updates efficiently
-        completed_count = i + 1
-        if completed_count % 15 == 0 or completed_count == total_cases:
-            progress_percentage = max(6, min(100, int((completed_count / total_cases) * 100)))
-            await manager.broadcast({
-                "type": "stage_update",
-                "data": {
-                    "stage": "Guardrail & Execution",
-                    "progress": progress_percentage,
-                    "completed": completed_count,
-                    "total": total_cases,
-                    "description": f"Evaluating policy & executing ({completed_count}/{total_cases}) · {lifecycle}"
-                }
-            })
-            await asyncio.sleep(0.005)
+        # Broadcast Stage 6: Completed
+        await manager.broadcast({
+            "type": "stage_update",
+            "data": {"stage": "Updating Metrics", "progress": 100, "description": "Completed batch evaluation and multi-baseline comparison"}
+        })
 
-        # --- Evaluate Baselines Parallel ---
-        # 1. FCFS
-        fcfs_dec = fcfs_map.get(p.id)
-        fcfs_guard = policy_engine.evaluate(p, fcfs_dec)
-        if fcfs_guard.outcome == "ALLOW" and fcfs_dec.allocated:
-            fcfs_costs += get_action_cost(fcfs_dec.candidate_action, p.amount_paise)
-            fcfs_rec, _ = simulate_recovery_outcome(p.id, fcfs_dec.candidate_action, diag.cause, p.amount_paise, prior_cnt)
-            if fcfs_rec:
-                fcfs_recovered += p.amount_paise
-                cause_breakdown[diag.cause]["fcfs"] += p.amount_paise
-
-        # 2. Highest Amount First
-        ha_dec = ha_map.get(p.id)
-        ha_guard = policy_engine.evaluate(p, ha_dec)
-        if ha_guard.outcome == "ALLOW" and ha_dec.allocated:
-            ha_costs += get_action_cost(ha_dec.candidate_action, p.amount_paise)
-            ha_rec, _ = simulate_recovery_outcome(p.id, ha_dec.candidate_action, diag.cause, p.amount_paise, prior_cnt)
-            if ha_rec:
-                ha_recovered += p.amount_paise
-                cause_breakdown[diag.cause]["highest_amount"] += p.amount_paise
-
-        # 3. Highest Probability First
-        hp_dec = hp_map.get(p.id)
-        hp_guard = policy_engine.evaluate(p, hp_dec)
-        if hp_guard.outcome == "ALLOW" and hp_dec.allocated:
-            hp_costs += get_action_cost(hp_dec.candidate_action, p.amount_paise)
-            hp_rec, _ = simulate_recovery_outcome(p.id, hp_dec.candidate_action, diag.cause, p.amount_paise, prior_cnt)
-            if hp_rec:
-                hp_recovered += p.amount_paise
-                cause_breakdown[diag.cause]["highest_probability"] += p.amount_paise
-
-    # Save all cases to store in single fast transaction
-    store.upsert_cases_batch(batch_cases_to_save)
-
-    # 6. Finalize comparative stats
-    results_cache.optimized_recovered_paise = opt_recovered
-    results_cache.baseline_recovered_paise = fcfs_recovered
-    results_cache.last_outcomes = batch_outcomes_records
-    results_cache.contacts_avoided_count = contacts_avoided
-    results_cache.total_revenue_at_risk_paise = total_revenue_at_risk
-    
-    net_opt = opt_recovered - (opt_costs + opt_fatigue_costs)
-    net_fcfs = fcfs_recovered - fcfs_costs
-    results_cache.net_value_created_paise = max(0, net_opt - net_fcfs)
-
-
-    def calc_uplift(opt_val: int, base_val: int) -> float:
-        if base_val > 0:
-            return round(((opt_val - base_val) / base_val) * 100.0, 1)
-        elif opt_val > 0:
-            return 100.0
-        return 0.0
-
-    uplift_fcfs = calc_uplift(opt_recovered, fcfs_recovered)
-    uplift_ha = calc_uplift(opt_recovered, ha_recovered)
-    uplift_hp = calc_uplift(opt_recovered, hp_recovered)
-
-    results_cache.uplift_pct = uplift_fcfs
-    results_cache.by_cause = cause_breakdown
-
-    results_cache.strategies = {
-        "optimized": {
-            "name": "PuLP MILP Optimizer",
-            "recovered_paise": opt_recovered,
-            "total_cost_paise": opt_costs + opt_fatigue_costs,
-            "net_value_paise": opt_recovered - (opt_costs + opt_fatigue_costs),
-            "uplift_pct_vs_fcfs": uplift_fcfs
-        },
-        "fcfs": {
-            "name": "First-Come First-Served (FCFS)",
-            "recovered_paise": fcfs_recovered,
-            "total_cost_paise": fcfs_costs,
-            "net_value_paise": fcfs_recovered - fcfs_costs,
-            "uplift_pct_vs_fcfs": 0.0
-        },
-        "highest_amount": {
-            "name": "Highest Amount First",
-            "recovered_paise": ha_recovered,
-            "total_cost_paise": ha_costs,
-            "net_value_paise": ha_recovered - ha_costs,
-            "uplift_pct": uplift_ha
-        },
-        "highest_probability": {
-            "name": "Highest Probability First",
-            "recovered_paise": hp_recovered,
-            "total_cost_paise": hp_costs,
-            "net_value_paise": hp_recovered - hp_costs,
-            "uplift_pct": uplift_hp
-        }
-    }
-
-    results_cache.is_running = False
-
-    # Broadcast Stage 6: Completed
-    await manager.broadcast({
-        "type": "stage_update",
-        "data": {"stage": "Updating Metrics", "progress": 100, "description": "Completed batch evaluation and multi-baseline comparison"}
-    })
-
-    await manager.broadcast({
-        "type": "run_completed",
-        "data": {
-            "optimized_recovered_paise": opt_recovered,
-            "baseline_recovered_paise": fcfs_recovered,
-            "uplift_pct": results_cache.uplift_pct,
-            "by_cause": cause_breakdown,
-            "strategies": results_cache.strategies,
-            "net_value_created_paise": results_cache.net_value_created_paise,
-            "total_revenue_at_risk_paise": total_revenue_at_risk,
-            "contacts_avoided_count": contacts_avoided
-        }
-    })
+        await manager.broadcast({
+            "type": "run_completed",
+            "data": {
+                "optimized_recovered_paise": opt_recovered,
+                "baseline_recovered_paise": fcfs_recovered,
+                "uplift_pct": results_cache.uplift_pct,
+                "by_cause": cause_breakdown,
+                "strategies": results_cache.strategies,
+                "net_value_created_paise": results_cache.net_value_created_paise,
+                "total_revenue_at_risk_paise": total_revenue_at_risk,
+                "contacts_avoided_count": contacts_avoided
+            }
+        })
+    finally:
+        results_cache.is_running = False
 
 @router.post("/seed-batch", dependencies=[Depends(verify_demo_secret)])
 def seed_batch(background_tasks: BackgroundTasks, limit: int = Query(210)):
-    if results_cache.is_running:
-        raise HTTPException(status_code=400, detail="A simulation batch is already running.")
-        
     store.clear_all()
     from seed.seed_data import generate_seed_payments
     payments = generate_seed_payments(count=limit)

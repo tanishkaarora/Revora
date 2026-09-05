@@ -18,7 +18,7 @@ class OllamaProvider(LLMProvider):
     def __init__(self, base_url: str = "http://localhost:11434", model: str = "llama3.1:8b"):
         self.base_url = base_url
         self.model = model
-        self.timeout = 3.0  # short timeout for live demo responsiveness
+        self.timeout = 0.5  # fast timeout for live responsiveness in cloud environments
 
     def _call_ollama_json(self, prompt: str, system_prompt: str = "") -> Optional[dict]:
         try:
