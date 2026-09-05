@@ -306,13 +306,11 @@ class AuditStore:
 
     def clear_all(self):
         """
-        Clears tables for seed data reset. Still does not use DELETE/UPDATE on the audit_log
-        except in this test/demo utility context where we DROP and recreate to simulate clean start.
+        Clears tables for seed data reset safely without schema table dropping.
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute("DROP TABLE IF EXISTS audit_log")
-            cursor.execute("DROP TABLE IF EXISTS promises")
-            cursor.execute("DROP TABLE IF EXISTS cases")
+            cursor.execute("DELETE FROM audit_log")
+            cursor.execute("DELETE FROM promises")
+            cursor.execute("DELETE FROM cases")
             conn.commit()
-        self.init_db()

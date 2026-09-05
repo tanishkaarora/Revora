@@ -413,7 +413,8 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                 "degradation_reason": degradation_reason
             }
             batch_cases_to_save.append(case_data)
-            await manager.broadcast_audit_entry(case_data)
+            if i < 25 or i % 5 == 0 or recovered:
+                await manager.broadcast_audit_entry(case_data)
 
             # Broadcast progress updates efficiently
             completed_count = i + 1
