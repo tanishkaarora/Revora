@@ -16,7 +16,7 @@ from app.audit.models import (
 
 class AuditStore:
     def __init__(self, db_path: str = "./data/recovery.db"):
-        self.db_path = db_path
+        self.db_path = os.getenv("DATABASE_PATH", db_path)
         # Ensure directory exists
         db_dir = os.path.dirname(self.db_path)
         if db_dir and not os.path.exists(db_dir):
