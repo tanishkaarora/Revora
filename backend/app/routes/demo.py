@@ -264,7 +264,12 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
         hp_costs = 0
 
         # 5. Process and Broadcast Cases one-by-one with Continuous Progress Updates
-        policy_engine = PolicyEngine(store)
+        policy_engine = PolicyEngine(
+            store=store,
+            opt_outs_set=set(),
+            contact_counts_map=prior_contacts,
+            active_promises_map={}
+        )
         batch_outcomes_records = []
         contacts_avoided = 0
 
