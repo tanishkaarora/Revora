@@ -545,12 +545,15 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                 "contacts_avoided_count": contacts_avoided
             }
         })
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception(f"Unhandled error in process_batch_background: {e}")
     finally:
         results_cache.is_running = False
 
 @router.post("/seed-batch", dependencies=[Depends(verify_demo_secret)])
 async def seed_batch(limit: int = Query(210)):
-    store.clear_all()
+    await asyncio.to_thread(store.clear_all)
     from seed.seed_data import generate_seed_payments
     payments = generate_seed_payments(count=limit)
     asyncio.create_task(process_batch_background(payments, 20))
