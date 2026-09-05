@@ -216,8 +216,8 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
             }
         })
 
-        # 3. Solve optimization (Triage)
-        opt_decisions = optimizer.allocate_batch(payments, diagnoses, prior_contacts)
+        # 3. Solve optimization (Triage) via thread worker
+        opt_decisions = await asyncio.to_thread(optimizer.allocate_batch, payments, diagnoses, prior_contacts)
         opt_decisions_map = {d.failed_payment_id: d for d in opt_decisions}
 
         # Store batch references and compute Capacity ROI (LP relaxation shadow prices)
@@ -228,7 +228,8 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
         try:
             from app.revora.triage.capacity_roi import compute_capacity_roi
 
-            results_cache.capacity_roi = compute_capacity_roi(
+            results_cache.capacity_roi = await asyncio.to_thread(
+                compute_capacity_roi,
                 payments=payments,
                 diagnoses=diagnoses,
                 prior_contacts_counts=prior_contacts,
@@ -241,14 +242,14 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
             import logging
             logging.getLogger(__name__).warning(f"Capacity ROI computation error: {e}")
 
-        # 4. Run Baseline allocations for multi-baseline comparison
-        fcfs_decisions = baseline_triage.allocate_batch_fcfs(payments, diagnoses, prior_contacts)
+        # 4. Run Baseline allocations for multi-baseline comparison via thread workers
+        fcfs_decisions = await asyncio.to_thread(baseline_triage.allocate_batch_fcfs, payments, diagnoses, prior_contacts)
         fcfs_map = {d.failed_payment_id: d for d in fcfs_decisions}
 
-        ha_decisions = baseline_triage.allocate_batch_highest_amount(payments, diagnoses, prior_contacts)
+        ha_decisions = await asyncio.to_thread(baseline_triage.allocate_batch_highest_amount, payments, diagnoses, prior_contacts)
         ha_map = {d.failed_payment_id: d for d in ha_decisions}
 
-        hp_decisions = baseline_triage.allocate_batch_highest_prob(payments, diagnoses, prior_contacts)
+        hp_decisions = await asyncio.to_thread(baseline_triage.allocate_batch_highest_prob, payments, diagnoses, prior_contacts)
         hp_map = {d.failed_payment_id: d for d in hp_decisions}
 
         # Baseline tracking
@@ -463,8 +464,8 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                     hp_recovered += p.amount_paise
                     cause_breakdown[diag.cause]["highest_probability"] += p.amount_paise
 
-        # Save all cases to store in single fast transaction
-        store.upsert_cases_batch(batch_cases_to_save)
+        # Save all cases to store in single fast transaction via thread worker
+        await asyncio.to_thread(store.upsert_cases_batch, batch_cases_to_save)
 
         # 6. Finalize comparative stats
         results_cache.optimized_recovered_paise = opt_recovered
