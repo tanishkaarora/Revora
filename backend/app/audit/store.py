@@ -132,6 +132,18 @@ class AuditStore:
                 return dict(row)
             return None
 
+    def is_customer_opted_out(self, customer_id: str) -> bool:
+        """
+        Checks if the customer has explicitly opted out / refused contact.
+        """
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT 1 FROM promises WHERE customer_id = ? AND status IN ('opted_out', 'refused') LIMIT 1",
+                (customer_id,)
+            )
+            return cursor.fetchone() is not None
+
     def get_all_promises(self) -> List[Dict[str, Any]]:
         with self.get_connection() as conn:
             cursor = conn.cursor()

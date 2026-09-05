@@ -777,14 +777,23 @@ def run_experiment(count: int = Query(120)):
         "group_b": group_b_results
     }
 
+adversarial_counter = 0
+
 @router.post("/trigger-adversarial-case", dependencies=[Depends(verify_demo_secret)])
-async def trigger_adversarial_case():
+async def trigger_adversarial_case(index: Optional[int] = Query(None)):
+    global adversarial_counter
     from seed.seed_data import generate_seed_payments
     all_adv = [p for p in generate_seed_payments() if p.id.startswith("pay_adv_")]
     if not all_adv:
         raise HTTPException(status_code=500, detail="Adversarial cases failed to generate")
         
-    p = all_adv[0]
+    if index is not None:
+        case_idx = index % len(all_adv)
+    else:
+        case_idx = adversarial_counter % len(all_adv)
+        adversarial_counter += 1
+
+    p = all_adv[case_idx]
     diag = diagnosis_engine.diagnose(p)
     prior_contacts = {p.customer_id: store.get_recent_contacts_count(p.customer_id)}
     opt_dec = optimizer.allocate_batch([p], {p.id: diag}, prior_contacts)[0]

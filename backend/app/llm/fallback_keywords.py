@@ -3,21 +3,49 @@ from datetime import datetime, timedelta
 from typing import Tuple, Optional
 from app.guardrail.types import FailureCause
 
-# Negations that indicate clear non-commitment
+# Negations & Refusals that indicate clear refusal or opt-out
+FALLBACK_REFUSAL_WORDS = [
+    # English
+    "stop messaging me", "stop messages", "stop messaging", "stop texting",
+    "stop calling", "stop contact", "stop", "i will not pay", "will not pay", 
+    "wont pay", "won't pay", "not paying", "not going to pay", "leave me alone", 
+    "unsubscribe", "opt out", "opt-out", "dont text me", "don't text me", 
+    "dont message me", "don't message me", "do not contact", "don't contact", 
+    "never contact", "cancel subscription", "block", "spam", "fraud", 
+    "i refuse", "refuse to pay", "reported", "dont disturb", "don't disturb", 
+    "do not disturb", "not interested",
+    # Hinglish
+    "mat message karo", "message mat karo", "message mat bhejo", "msg mat karo",
+    "paise nahi dunga", "paise nahi dene", "nahi pay karunga", "nahi pay karenge",
+    "nahi dunga", "nahi dungi", "nahi dunga paise", "disturb mat karo", 
+    "phone mat karo", "call mat karo", "band karo", "dobara message mat karna", 
+    "dobara contact mat karna", "chhod do", "nahi karna payment", "nahi hoga payment", 
+    "nahi karunga", "nahi karenge"
+]
+
 FALLBACK_NEGATIONS = [
     "not pay", "not retry", "never", "stop", "cancel", "no ", "not paying", 
     "don't", "dont", "no,", "nahi karunga", "nahi hoga", "nahi karna", "mat karo", "fraud"
 ]
 
+import re
+
+# Patterns indicating customer is explicitly requesting payment/retry link
+FALLBACK_LINK_REQUEST_PATTERNS = [
+    r"\b(?:payment link|retry link|link)\b.*?\b(?:send|bhejo|de do|kardo|karo|bhej do|share|give|please|provide|resend)\b",
+    r"\b(?:send|bhejo|share|give|resend|provide)\b.*?\b(?:payment link|retry link|link)\b",
+    r"\b(?:link bhejo|link send|link please|link do|link dedo|link share)\b"
+]
+
 # Hinglish Affirmatives, Actions, and Temporal signals indicating commitment
-FALLBACK_COMMIT_WORDS = [
-    "haan", "haa", "ha", "theek hai", "thik hai", "theek", "thik", 
-    "ok", "okay", "yes", "sure", "pakka", "done", "kar dunga", "kar denge", 
-    "karta hu", "karti hu", "karenge", "bhej dunga", "pay", "retry", "doing",
-    "kal", "tomorrow", "parso", "shyam", "evening", "morning", "afternoon", "dopahar",
-    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-    "somwar", "mangalwar", "budhwar", "guruwar", "shukrawar", "shaniwar", "ravivar",
-    "date", "thodi der", "later", "baad", "agale", "next"
+FALLBACK_COMMIT_PATTERNS = [
+    r"\b(?:haan|haa|theek hai|thik hai|theek|thik|ok|okay|yes|sure|pakka|done)\b",
+    r"\b(?:kar dunga|kar denge|karta hu|karti hu|karenge|bhej dunga)\b",
+    r"\b(?:will pay|pay kar|paying|will clear|will retry|doing it|doing now|clearing)\b",
+    r"\b(?:kal|tomorrow|parso|shyam|evening|morning|dopahar)\b",
+    r"\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b",
+    r"\b(?:somwar|mangalwar|budhwar|guruwar|shukrawar|shaniwar|ravivar)\b",
+    r"\b(?:later today|thodi der|baad me|agale|next week)\b"
 ]
 
 # Weekday index map (0 = Monday, ..., 6 = Sunday)
@@ -31,20 +59,30 @@ WEEKDAY_MAP = {
     "sunday": 6, "ravivar": 6
 }
 
-def fallback_extract_commitment(reply: str) -> Tuple[bool, Optional[str], float]:
+def fallback_extract_commitment(reply: str) -> Tuple[bool, Optional[str], float, str]:
     """
-    Deterministic rule-based fallback to extract commitment and target date
-    when LLM APIs (Ollama, Gemini, Groq) are offline, timing out, or unavailable.
+    Deterministic rule-based fallback to classify customer replies into:
+    - 'commits': Promise to pay/retry with estimated target date
+    - 'refuses': Customer refusal / opt-out / request to stop outreach
+    - 'requests_link': Explicit customer request to receive the payment/retry link
+    - 'ambiguous': General inquiry or no clear commitment
+    
+    Returns:
+        (commits: bool, promised_date: Optional[str], confidence: float, outcome: str)
     """
-    reply_lower = reply.lower()
+    reply_lower = reply.lower().strip()
     today = datetime.now()
 
-    # 1. Check for explicit negations first
-    if any(neg in reply_lower for neg in FALLBACK_NEGATIONS):
-        return False, None, 0.9
+    # 1. Check for explicit refusal or opt-out phrases first
+    if any(ref in reply_lower for ref in FALLBACK_REFUSAL_WORDS) or any(neg in reply_lower for neg in FALLBACK_NEGATIONS):
+        return False, None, 0.95, "refuses"
 
-    # 2. Check for affirmative commitment signals
-    has_commit = any(w in reply_lower for w in FALLBACK_COMMIT_WORDS) or ("yes" in reply_lower and "not" not in reply_lower)
+    # 2. Check for explicit payment link request
+    if any(re.search(pat, reply_lower) for pat in FALLBACK_LINK_REQUEST_PATTERNS):
+        return False, None, 0.90, "requests_link"
+
+    # 3. Check for affirmative commitment signals with word boundaries
+    has_commit = any(re.search(pat, reply_lower) for pat in FALLBACK_COMMIT_PATTERNS)
     promised_date = None
     confidence = 0.5
 
@@ -70,7 +108,9 @@ def fallback_extract_commitment(reply: str) -> Tuple[bool, Optional[str], float]
             promised_date = today.strftime("%Y-%m-%d")
             confidence = 0.75
 
-    return has_commit, promised_date, confidence
+        return True, promised_date, confidence, "commits"
+
+    return False, None, confidence, "ambiguous"
 
 def fallback_classify_failure_cause(error_code: str, error_reason: str) -> Tuple[FailureCause, float]:
     """

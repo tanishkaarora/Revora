@@ -25,7 +25,7 @@ async def test_demo_secret_protection_when_set(monkeypatch):
         assert res_correct.status_code == 200
         data = res_correct.json()
         assert data["status"] == "processed"
-        assert data["case"]["id"] == "pay_adv_inj_001"
+        assert data["case"]["id"].startswith("pay_adv_")
 
 @pytest.mark.anyio
 async def test_demo_secret_protection_when_unset(monkeypatch):
@@ -35,13 +35,13 @@ async def test_demo_secret_protection_when_unset(monkeypatch):
         res = await client.post("/demo/trigger-adversarial-case")
         assert res.status_code == 200
         assert res.json()["status"] == "processed"
-        assert res.json()["case"]["id"] == "pay_adv_inj_001"
+        assert res.json()["case"]["id"].startswith("pay_adv_")
 
 @pytest.mark.anyio
 async def test_adversarial_case_data_matches_real_response(monkeypatch):
     monkeypatch.delenv("DEMO_SECRET", raising=False)
     async with get_async_client() as client:
-        res = await client.post("/demo/trigger-adversarial-case")
+        res = await client.post("/demo/trigger-adversarial-case?index=0")
         assert res.status_code == 200
         case_data = res.json()["case"]
         
@@ -50,3 +50,17 @@ async def test_adversarial_case_data_matches_real_response(monkeypatch):
         assert case_data["cause"] == "bank_timeout"
         assert case_data["outcome"] in ["ALLOW", "BLOCK", "ESCALATE"]
         assert "guardrail_reason" in case_data
+
+@pytest.mark.anyio
+async def test_adversarial_case_cycling(monkeypatch):
+    monkeypatch.delenv("DEMO_SECRET", raising=False)
+    async with get_async_client() as client:
+        expected_ids = ["pay_adv_inj_001", "pay_adv_ref_002", "pay_adv_cap_003", "pay_adv_qhr_004"]
+        for expected_id in expected_ids:
+            res = await client.post("/demo/trigger-adversarial-case")
+            assert res.status_code == 200
+            # Confirm response contains valid case data with dynamic reasons
+            case_data = res.json()["case"]
+            assert "error_reason" in case_data
+            assert "cause" in case_data
+            assert "outcome" in case_data

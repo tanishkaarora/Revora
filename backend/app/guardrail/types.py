@@ -54,9 +54,13 @@ class GuardrailDecision(BaseModel):
 class Commitment(BaseModel):
     failed_payment_id: str
     commits: bool
+    refuses: bool = False
+    requests_link: bool = False
+    outcome: Literal["commits", "refuses", "requests_link", "ambiguous"] = "ambiguous"
     promised_date: Optional[str] = None
     confidence: float
     raw_reply: str
+    reason: Optional[str] = None
 
 class RecoveryOutcome(BaseModel):
     failed_payment_id: str

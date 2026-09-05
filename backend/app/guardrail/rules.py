@@ -13,6 +13,11 @@ def check_kill_switch() -> Tuple[DecisionOutcome, str, str]:
         return "BLOCK", "kill_switch_active", "Global emergency freeze active."
     return "ALLOW", "none", ""
 
+def check_opt_out(customer_id: str, store: AuditStore) -> Tuple[DecisionOutcome, str, str]:
+    if store.is_customer_opted_out(customer_id):
+        return "BLOCK", "customer_opted_out", "Customer has explicitly refused outreach or opted out. Permanent suppression active."
+    return "ALLOW", "none", ""
+
 def check_contact_cap(customer_id: str, store: AuditStore) -> Tuple[DecisionOutcome, str, str]:
     max_contacts = int(os.getenv("MAX_CONTACTS_PER_CASE", "3"))
     contacts_count = store.get_recent_contacts_count(customer_id)

@@ -26,12 +26,13 @@ class LLMProvider(ABC):
         pass
 
     @abstractmethod
-    def extract_commitment(self, reply: str) -> Tuple[bool, Optional[str], float]:
+    def extract_commitment(self, reply: str) -> Tuple[bool, Optional[str], float, str]:
         """
         Parses a customer reply to determine:
         1. Whether they promised/committed to pay (bool)
         2. A target date if specified (YYYY-MM-DD format or None)
         3. Confidence level (float)
+        4. Outcome category ("commits" | "refuses" | "ambiguous")
         """
         pass
 
@@ -45,4 +46,5 @@ class LLMProvider(ABC):
 
     def _fallback_commitment(self, reply: str) -> Tuple[bool, Optional[str], float]:
         """Shared fallback wrapper for commitment extraction."""
-        return fallback_extract_commitment(reply)
+        commits, p_date, conf, _ = fallback_extract_commitment(reply)
+        return commits, p_date, conf

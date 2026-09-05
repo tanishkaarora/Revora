@@ -226,3 +226,29 @@ def test_guardrail_refund_escalation(test_db, sample_payment):
     
     assert decision.outcome == "ESCALATE"
     assert decision.rule_fired == "refund_signature_required"
+
+def test_guardrail_opt_out(test_db, sample_payment, sample_triage):
+    engine = PolicyEngine(test_db)
+    kill_switch.set_active(False)
+    
+    # Store opt-out status for this customer
+    test_db.create_or_update_promise(
+        failed_payment_id="pay_test_optout",
+        customer_id=sample_payment.customer_id,
+        promised_date=None,
+        confidence=0.95,
+        status="opted_out",
+        raw_reply="stop messaging me",
+        timestamp=datetime.now().isoformat()
+    )
+
+    decision = engine.evaluate(
+        payment=sample_payment,
+        triage=sample_triage,
+        current_time_str="12:00",
+        current_date_str="2026-08-28"
+    )
+    
+    assert decision.outcome == "BLOCK"
+    assert decision.rule_fired == "customer_opted_out"
+    assert "refused outreach or opted out" in decision.reason

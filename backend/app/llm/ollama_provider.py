@@ -98,27 +98,32 @@ class OllamaProvider(LLMProvider):
             
         return fallback_generate_hinglish_message(customer_name, amount_rupees, payment_link, cause)
 
-    def extract_commitment(self, reply: str) -> Tuple[bool, Optional[str], float]:
+    def extract_commitment(self, reply: str) -> Tuple[bool, Optional[str], float, str]:
         system_prompt = (
-            "You are a commitment extraction model. Analyze the customer's text message and return a JSON object with "
-            "exactly three keys: 'commits' (boolean, true if they promise/commit to pay/retry), "
+            "You are a customer reply classification model. Analyze the customer's text message and return a JSON object with "
+            "exactly four keys: "
+            "'outcome' (string: 'commits' if customer commits/promises to pay or retry; 'refuses' if customer refuses to pay, opts out, or asks to stop messaging; 'requests_link' if customer explicitly asks for the payment/retry link; 'ambiguous' otherwise), "
+            "'commits' (boolean, true if outcome is 'commits', else false), "
             "'promised_date' (string formatted as YYYY-MM-DD if they mention a time like 'tomorrow', 'by monday', or 'on 25th', otherwise null), "
             "and 'confidence' (float between 0.0 and 1.0)."
         )
         current_date_str = datetime.now().strftime("%Y-%m-%d")
-        prompt = f"Analyze this text message. Current date is {current_date_str}.\nMessage: \"{reply}\""
+        prompt = f"Analyze this customer text message. Current date is {current_date_str}.\nMessage: \"{reply}\""
         
         response_json = self._call_ollama_json(prompt, system_prompt)
         
         if response_json and "commits" in response_json:
             commits = bool(response_json["commits"])
+            outcome = response_json.get("outcome")
+            if not outcome or outcome not in ["commits", "refuses", "requests_link", "ambiguous"]:
+                outcome = "commits" if commits else "ambiguous"
             confidence = float(response_json.get("confidence", 0.8))
             promised_date = response_json.get("promised_date")
             
             # Format correction
             if promised_date and len(promised_date) != 10:
                 promised_date = None
-            return commits, promised_date, confidence
+            return commits, promised_date, confidence, outcome
 
         return fallback_extract_commitment(reply)
 

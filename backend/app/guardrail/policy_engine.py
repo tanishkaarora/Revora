@@ -4,6 +4,7 @@ from typing import Optional
 from app.guardrail.types import FailedPayment, TriageDecision, GuardrailDecision, DecisionOutcome
 from app.guardrail.rules import (
     check_kill_switch,
+    check_opt_out,
     check_contact_cap,
     check_quiet_hours,
     check_promise_suppression,
@@ -41,7 +42,12 @@ class PolicyEngine:
         if outcome != "ALLOW":
             return self._build_decision(payment.id, outcome, rule, reason)
 
-        # 2. Check Contact-Frequency Cap
+        # 2. Check Customer Opt-Out / Refusal (Permanent Suppression)
+        outcome, rule, reason = check_opt_out(payment.customer_id, self.store)
+        if outcome != "ALLOW":
+            return self._build_decision(payment.id, outcome, rule, reason)
+
+        # 3. Check Contact-Frequency Cap
         outcome, rule, reason = check_contact_cap(payment.customer_id, self.store)
         if outcome != "ALLOW":
             return self._build_decision(payment.id, outcome, rule, reason)
