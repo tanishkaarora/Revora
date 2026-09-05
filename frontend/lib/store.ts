@@ -293,7 +293,37 @@ export const useAppStore = create<AppState>((set, get) => ({
           liveStage: null, 
           seedBatchError: `Failed to execute recovery batch (${response.status}): ${errorText || 'Server error'}`
         });
+        return;
       }
+
+      // Robust background polling to ensure results are fetched even if WebSocket messages drop
+      let pollCount = 0;
+      const pollInterval = setInterval(async () => {
+        pollCount += 1;
+        try {
+          const res = await fetch(`${BACKEND_URL}/results/comparison`);
+          if (res.ok) {
+            const compData = await res.json();
+            if (compData && compData.strategies && Object.keys(compData.strategies).length > 0) {
+              set({ comparison: compData });
+              if (get().cases.length === 0 || !get().simulationRunning) {
+                await get().fetchCases();
+              }
+              if (!get().simulationRunning || pollCount > 30) {
+                clearInterval(pollInterval);
+                set({ simulationRunning: false, liveStage: null });
+                await get().fetchCases();
+                await get().fetchCapacityRoi();
+              }
+            }
+          }
+        } catch (e) {
+          // ignore transient poll error
+        }
+        if (pollCount > 40) {
+          clearInterval(pollInterval);
+        }
+      }, 1000);
     } catch (error: any) {
       console.error('Failed to seed batch:', error);
       set({ 
@@ -303,6 +333,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       });
     }
   },
+
 
   triggerAdversarial: async () => {
     try {

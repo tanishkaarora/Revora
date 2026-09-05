@@ -253,7 +253,7 @@ export default function Dashboard() {
                     <AnimatedNumber value={incrementalNetValueRupees} prefix="₹" />
                   </span>
                   <span className="text-xs font-semibold text-brand-brass bg-brand-brass-surface px-2 py-0.5 rounded-full border border-brand-brass-border">
-                    {comparison.uplift_pct !== undefined ? `${comparison.uplift_pct >= 0 ? '+' : ''}${comparison.uplift_pct}%` : '+51.6%'}
+                    {comparison.uplift_pct ? `${comparison.uplift_pct >= 0 ? '+' : ''}${comparison.uplift_pct.toFixed(1)}%` : '+51.6%'}
                   </span>
                 </div>
                 <span className="text-xs text-content-secondary block mt-0.5">

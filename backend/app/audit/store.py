@@ -197,6 +197,57 @@ class AuditStore:
             )
             conn.commit()
 
+    def upsert_cases_batch(self, cases_list: List[Dict[str, Any]]):
+        if not cases_list:
+            return
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            params = [
+                (
+                    c["id"],
+                    c["customer_id"],
+                    c["amount_paise"],
+                    c["method"],
+                    c["error_code"],
+                    c["error_reason"],
+                    c["timestamp"],
+                    c["cause"],
+                    c["diagnosis_confidence"],
+                    c["diagnosis_source"],
+                    c.get("evidence_json", "{}"),
+                    c["candidate_action"],
+                    c["channel"],
+                    c["expected_value"],
+                    c["probability_estimate"],
+                    c["cost"],
+                    1 if c.get("allocated", False) else 0,
+                    c["triage_reason"],
+                    c["outcome"],
+                    c["rule_fired"],
+                    c["guardrail_reason"],
+                    c.get("lifecycle_state", "FAILED"),
+                    1 if c.get("recovered", False) else 0,
+                    c.get("amount_recovered_paise", 0),
+                    c.get("conversation_json", "[]"),
+                    1 if c.get("degraded", False) else 0,
+                    c.get("degradation_reason")
+                )
+                for c in cases_list
+            ]
+            cursor.executemany(
+                """
+                INSERT OR REPLACE INTO cases (
+                    id, customer_id, amount_paise, method, error_code, error_reason, timestamp,
+                    cause, diagnosis_confidence, diagnosis_source, evidence_json,
+                    candidate_action, channel, expected_value, probability_estimate, cost, allocated, triage_reason,
+                    outcome, rule_fired, guardrail_reason, lifecycle_state,
+                    recovered, amount_recovered_paise, conversation_json, degraded, degradation_reason
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                params
+            )
+            conn.commit()
+
 
     def get_case(self, case_id: str) -> Optional[Dict[str, Any]]:
         with self.get_connection() as conn:

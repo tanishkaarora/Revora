@@ -265,6 +265,7 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
     batch_outcomes_records = []
     contacts_avoided = 0
 
+    batch_cases_to_save = []
     for i, p in enumerate(payments):
         if kill_switch.is_active():
             results_cache.is_running = False
@@ -385,21 +386,7 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                 "recovered": 1 if recovered else 0
             })
 
-        # Save to database
-        audit_entry = AuditLogEntry(
-            id=f"audit_{p.id}",
-            failed_payment=p,
-            diagnosis=diag,
-            triage_decision=opt_dec,
-            guardrail_decision=guard_dec,
-            outcome=rec_outcome,
-            lifecycle_state=lifecycle,
-            degraded=degraded,
-            degradation_reason=degradation_reason,
-            timestamp=datetime.now().isoformat()
-        )
-        store.add_audit_entry(audit_entry)
-
+        # Build case data
         from seed.seed_data import get_customer_name
         case_data = {
             "id": p.id,
@@ -431,23 +418,24 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
             "degraded": degraded,
             "degradation_reason": degradation_reason
         }
-        store.upsert_case(case_data)
+        batch_cases_to_save.append(case_data)
         await manager.broadcast_audit_entry(case_data)
 
-        # Continuous Progress Calculation driven by completed case count
+        # Broadcast progress updates efficiently
         completed_count = i + 1
-        progress_percentage = max(6, min(100, int((completed_count / total_cases) * 100)))
-
-        await manager.broadcast({
-            "type": "stage_update",
-            "data": {
-                "stage": "Guardrail & Execution",
-                "progress": progress_percentage,
-                "completed": completed_count,
-                "total": total_cases,
-                "description": f"Evaluating policy & executing ({completed_count}/{total_cases}) · {lifecycle}"
-            }
-        })
+        if completed_count % 15 == 0 or completed_count == total_cases:
+            progress_percentage = max(6, min(100, int((completed_count / total_cases) * 100)))
+            await manager.broadcast({
+                "type": "stage_update",
+                "data": {
+                    "stage": "Guardrail & Execution",
+                    "progress": progress_percentage,
+                    "completed": completed_count,
+                    "total": total_cases,
+                    "description": f"Evaluating policy & executing ({completed_count}/{total_cases}) · {lifecycle}"
+                }
+            })
+            await asyncio.sleep(0.005)
 
         # --- Evaluate Baselines Parallel ---
         # 1. FCFS
@@ -480,16 +468,20 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
                 hp_recovered += p.amount_paise
                 cause_breakdown[diag.cause]["highest_probability"] += p.amount_paise
 
-        if delay_ms > 0:
-            await asyncio.sleep(delay_ms / 1000.0)
-
+    # Save all cases to store in single fast transaction
+    store.upsert_cases_batch(batch_cases_to_save)
 
     # 6. Finalize comparative stats
     results_cache.optimized_recovered_paise = opt_recovered
     results_cache.baseline_recovered_paise = fcfs_recovered
     results_cache.last_outcomes = batch_outcomes_records
     results_cache.contacts_avoided_count = contacts_avoided
-    results_cache.net_value_created_paise = max(0, opt_recovered - (opt_costs + opt_fatigue_costs))
+    results_cache.total_revenue_at_risk_paise = total_revenue_at_risk
+    
+    net_opt = opt_recovered - (opt_costs + opt_fatigue_costs)
+    net_fcfs = fcfs_recovered - fcfs_costs
+    results_cache.net_value_created_paise = max(0, net_opt - net_fcfs)
+
 
     def calc_uplift(opt_val: int, base_val: int) -> float:
         if base_val > 0:
