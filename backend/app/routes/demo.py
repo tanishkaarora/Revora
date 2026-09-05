@@ -558,6 +558,8 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
 
 @router.post("/seed-batch", dependencies=[Depends(verify_demo_secret)])
 async def seed_batch(limit: int = Query(210)):
+    failure_flags["llm_timeout"] = False
+    failure_flags["razorpay_error"] = False
     await asyncio.to_thread(store.clear_all)
     from seed.seed_data import generate_seed_payments
     payments = generate_seed_payments(count=limit)
