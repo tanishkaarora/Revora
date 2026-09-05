@@ -47,7 +47,7 @@
 | **Frontend Dashboard** | [https://revora-recovery.vercel.app](https://revora-recovery.vercel.app) *(Alternate: [revora-engine.vercel.app](https://revora-engine.vercel.app))* | 🟢 Live on Vercel |
 | **Backend API Engine** | [https://revora-backend-5q4x.onrender.com](https://revora-backend-5q4x.onrender.com) | 🟢 Live on Render |
 | **API Documentation** | [https://revora-backend-5q4x.onrender.com/docs](https://revora-backend-5q4x.onrender.com/docs) | 🟢 Swagger UI |
-| **Demo Pitch Video** | [Watch Pitch Video & Walkthrough (https://drive.google.com/file/d/1HKgUL8auO85_CA7mgTMlr0FWQ6J6e00P/view?usp=sharing)] | 🎥 Recording Available |
+| **Demo Pitch Video** |  (https://drive.google.com/file/d/1HKgUL8auO85_CA7mgTMlr0FWQ6J6e00P/view?usp=sharing) | 🎥 Recording Available |
 
 > **Note on Render Free Tier**: The backend service spins down after inactivity. On initial visit, the first request may encounter a ~30–45s cold start delay while the instance resumes.
 
