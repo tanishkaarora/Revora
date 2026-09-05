@@ -61,6 +61,10 @@ def read_root():
         "kill_switch_active": kill_switch.is_active()
     }
 
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
 
 # Native WebSocket Endpoint for Real-time Dashboard Updates
 @app.websocket("/ws/stream")

@@ -64,3 +64,10 @@ async def test_adversarial_case_cycling(monkeypatch):
             assert "error_reason" in case_data
             assert "cause" in case_data
             assert "outcome" in case_data
+
+@pytest.mark.anyio
+async def test_health_endpoint():
+    async with get_async_client() as client:
+        res = await client.get("/health")
+        assert res.status_code == 200
+        assert res.json() == {"status": "ok"}

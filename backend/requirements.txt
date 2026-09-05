@@ -8,4 +8,6 @@ websockets==12.0
 google-generativeai==0.4.1
 requests==2.31.0
 pytest==8.1.1
-groq>=0.9.0
+groq==0.37.1
+python-multipart==0.0.22
+httpx==0.28.1
