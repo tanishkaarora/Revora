@@ -161,7 +161,7 @@ def compute_capacity_roi(
     human_dual = 0.0
 
     try:
-        status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
+        status = prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=2.0))
         if status == pulp.LpStatusOptimal:
             # Extract dual values (.pi)
             c_wa = prob.constraints.get("whatsapp_capacity")

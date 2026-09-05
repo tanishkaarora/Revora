@@ -122,8 +122,8 @@ class TriageOptimizer:
 
         # 8. Solve the LP
         try:
-            # Use default CBC solver, suppress console output
-            status = prob.solve(pulp.PULP_CBC_CMD(msg=False))
+            # Use default CBC solver with fast timeLimit, suppress console output
+            status = prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=2.0))
         except Exception as e:
             logger.error(f"PuLP optimization failed: {e}. Falling back to default heuristics.")
             status = pulp.LpStatusInfeasible
