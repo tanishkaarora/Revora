@@ -290,6 +290,8 @@ Revora/
 │   └── requirements.txt                 # Backend dependencies
 ├── data/
 │   └── payment_cohort.csv               # Synthetic labeled demo dataset (210 payment failures)
+├── docs/
+│   └── screenshots/                     # Architecture & dashboard walkthrough visuals
 ├── frontend/
 │   ├── app/
 │   │   ├── globals.css                  # Tailwind styles & theme variables
@@ -511,13 +513,33 @@ Revora Guard Defense:
 
 ## 🖼️ Screenshots & UI Walkthrough
 
-| Screen | Description |
-| :--- | :--- |
-| **Main Recovery Dashboard** | Real-time overview of total revenue at risk (₹1,224,980), recovered amount (₹606,666+), recovery rate (54.5%+), active capacity gauges, and live WebSocket transaction feed. |
-| **Case Detail & Audit Drawer** | Step-by-step diagnostic breakdown, channel Expected Net Value ($ENV$) comparison matrix, and 5-stage Guardrail policy audit trace. |
-| **Multi-Baseline Benchmarking** | Side-by-side performance comparison of Revora MILP against FCFS, Highest Amount, and Highest Probability with Wilson 95% Confidence Intervals. |
-| **Capacity ROI & Shadow Pricing** | Dynamic marginal yield curve derived from LP dual relaxation showing exact incremental value ($\lambda_j$) for each capacity unit. |
-| **Adversarial Security Lab** | Interactive testing playground to verify Guardrail immunity against adversarial prompt injection and social engineering attempts. |
+### 1. Autonomous Revenue Recovery Hero Landing
+![Revora Hero Landing](docs/screenshots/01_hero_landing.png)
+> **Landing Interface**: Introduces the Revora core value proposition — deciding where a merchant's limited recovery effort earns the most back while deterministic Guardrail ensures compliance.
+
+---
+
+### 2. Recovery Pulse — Capital Flow Pipeline & Overview
+![Revora Recovery Pulse](docs/screenshots/02_recovery_pulse_pipeline.png)
+> **Live Triage & Pipeline**: Displays aggregate cohort metrics (**₹12,01,192** at risk, **₹6,30,535** recovered at 52.5% yield, **+₹2,18,629** incremental net value vs FCFS) with 0 policy violations and 104 fatigue-suppressed contacts.
+
+---
+
+### 3. Multi-Strategy Optimization Benchmark
+![Multi-Strategy Benchmark](docs/screenshots/04_multi_strategy_benchmark.png)
+> **Optimization Benchmark**: Live head-to-head evaluation demonstrating **PuLP MILP Optimizer (₹6,30,535 / +53.1%)** outperforming **FCFS Chronological (₹4,11,905)**, **Highest Amount (₹6,04,694)**, and **Highest Probability (₹4,51,595)** under identical capacity constraints.
+
+---
+
+### 4. Failure Cause Diagnosis & Operational Invariants
+![Diagnosis and Invariants](docs/screenshots/03_diagnosis_and_invariants.png)
+> **Diagnostic Engine & Invariant Monitor**: Root cause diagnosis donut chart (Insufficient Balance, Wrong OTP, Bank Timeout, Expired Mandate, Card Declined) alongside active system invariants (Quiet Hours 10 PM–8 AM IST, 3 Contact Cap/24h, Dual Authorization > ₹5,000).
+
+---
+
+### 5. WhatsApp Hinglish Nudge Simulator & Commitment State Machine
+![WhatsApp Commitment Simulator](docs/screenshots/05_whatsapp_commitment_simulator.png)
+> **Conversational Execution & Safety Gate**: Demonstrates localized Hinglish outreach with Razorpay payment link dispatch, real-time commitment extraction (*"Kal subah pay kar dunga pakka"*), and automatic outreach suppression (`Policy status: HOLD`).
 
 ---
 
