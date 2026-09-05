@@ -1,6 +1,6 @@
 # REVORA — Revenue Recovery Intelligence
 
-> **Vasooli-successor system that decides where a merchant's limited recovery capacity earns the most back, while Guardrail ensures it never oversteps.**
+> **An intelligent revenue recovery operating system that decides where a merchant's limited recovery capacity earns the most back, while Guardrail ensures it never oversteps.**
 
 [![Python](https://img.shields.io/badge/Python-3.11%2B-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110%2B-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
