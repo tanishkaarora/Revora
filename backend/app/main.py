@@ -67,7 +67,8 @@ def health_check():
     return {"status": "ok"}
 
 
-# Native WebSocket Endpoint for Real-time Dashboard Updates
+# Native WebSocket Endpoints for Real-time Dashboard Updates
+@app.websocket("/ws")
 @app.websocket("/ws/stream")
 async def websocket_stream_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
