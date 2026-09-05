@@ -23,6 +23,7 @@ export default function CapacityROI() {
   const [sliderValue, setSliderValue] = useState<number>(whatsappItem.capacity_total || 50);
   const [simulation, setSimulation] = useState<CapacitySimulateResponse | null>(null);
   const [isSimulating, setIsSimulating] = useState<boolean>(false);
+  const [simError, setSimError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCapacityRoi();
@@ -43,11 +44,19 @@ export default function CapacityROI() {
   const runSimulation = useCallback(
     async (val: number) => {
       setIsSimulating(true);
-      const res = await simulateCapacity('whatsapp', val);
-      if (res) {
-        setSimulation(res);
+      setSimError(null);
+      try {
+        const res = await simulateCapacity('whatsapp', val);
+        if (res) {
+          setSimulation(res);
+        } else {
+          setSimError('Simulation request returned empty response.');
+        }
+      } catch (err: any) {
+        setSimError(`Failed to simulate capacity: ${err?.message || 'Check backend connection'}`);
+      } finally {
+        setIsSimulating(false);
       }
-      setIsSimulating(false);
     },
     [simulateCapacity]
   );
@@ -212,6 +221,22 @@ export default function CapacityROI() {
               : 'Full MILP Re-optimized (Δ > ±20%)'}
           </span>
         </div>
+
+        {simError && (
+          <div className="mb-4 p-3 bg-brand-burgundy-surface border border-brand-burgundy-border text-brand-burgundy rounded-xl text-xs flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+              {simError}
+            </span>
+            <button
+              type="button"
+              onClick={() => runSimulation(sliderValue)}
+              className="px-2 py-0.5 bg-brand-burgundy text-white rounded text-[10px] font-medium cursor-pointer"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Slider & Value Controls */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">

@@ -152,7 +152,7 @@ class TriageOptimizer:
                 from app.revora.triage.expected_value import get_action_cost
                 cost = get_action_cost(assigned_action, p.amount_paise)
                 
-                reason = f"LP Solver assigned '{assigned_action}' on channel '{channel}'"
+                reason = f"MILP Optimizer assigned '{assigned_action}' on channel '{channel}'"
                 if channel == "whatsapp":
                     reason += f" (WhatsApp Capacity cap: {self.capacity_whatsapp})"
                 elif channel == "human":

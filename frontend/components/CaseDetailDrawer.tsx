@@ -113,7 +113,7 @@ export default function CaseDetailDrawer() {
     },
     {
       name: 'High-Value Dual Authorization',
-      desc: 'Requires HMAC signature on refunds >₹5,000',
+      desc: 'Requires manual authorization on refunds >₹5,000',
       passed: c.rule_fired !== 'refund_signature_required'
     }
   ];
@@ -178,7 +178,7 @@ export default function CaseDetailDrawer() {
                   <Zap className="w-3.5 h-3.5" /> Optimal Action Selected
                 </span>
                 <span className="text-[10px] text-content-tertiary bg-surface-subtle px-2 py-0.5 rounded border border-border-subtle font-medium">
-                  PuLP LP Solver
+                  MILP Optimizer
                 </span>
               </div>
 

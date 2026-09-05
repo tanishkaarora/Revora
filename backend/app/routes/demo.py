@@ -5,7 +5,7 @@ import hashlib
 import os
 import json
 from datetime import datetime
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Header, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, Tuple, List
 from app.audit.store import AuditStore
@@ -30,6 +30,12 @@ optimizer = TriageOptimizer()
 baseline_triage = BaselineTriage()
 conv_generator = ConversationGenerator()
 razorpay_client = RazorpayClient()
+
+def verify_demo_secret(x_demo_secret: Optional[str] = Header(None, alias="X-Demo-Secret")):
+    expected_secret = os.environ.get("DEMO_SECRET")
+    if expected_secret:
+        if not x_demo_secret or x_demo_secret != expected_secret:
+            raise HTTPException(status_code=403, detail="Invalid or missing X-Demo-Secret header")
 
 # Global variables to cache comparative results
 class ResultsCache:
@@ -261,11 +267,12 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
 
     for i, p in enumerate(payments):
         if kill_switch.is_active():
+            results_cache.is_running = False
             await manager.broadcast({
                 "type": "run_terminated",
                 "reason": "Kill switch activated mid-run"
             })
-            break
+            return
 
         opt_dec = opt_decisions_map.get(p.id)
         diag = diagnoses[p.id]
@@ -551,7 +558,7 @@ async def process_batch_background(payments: list, delay_ms: int = 20):
         }
     })
 
-@router.post("/seed-batch")
+@router.post("/seed-batch", dependencies=[Depends(verify_demo_secret)])
 def seed_batch(background_tasks: BackgroundTasks, limit: int = Query(210)):
     if results_cache.is_running:
         raise HTTPException(status_code=400, detail="A simulation batch is already running.")
@@ -563,7 +570,7 @@ def seed_batch(background_tasks: BackgroundTasks, limit: int = Query(210)):
     return {"status": "started", "cases_seeded": len(payments)}
 
 
-@router.post("/recalibrate")
+@router.post("/recalibrate", dependencies=[Depends(verify_demo_secret)])
 def recalibrate_model():
     """
     Part 7: Deterministic learning loop.
@@ -627,44 +634,83 @@ def recalibrate_model():
         "pairs": after_stats
     }
 
-@router.post("/run-experiment")
-def run_experiment(count: int = Query(100)):
-    """
-    Part 8: A/B Experimentation Engine.
-    Splits a batch of comparable cases into two groups deterministically,
-    applies candidate Action A to Group A and Action B to Group B,
-    and returns side-by-side performance metrics with the winner highlighted.
-    """
-    from seed.seed_data import generate_seed_payments
-    payments = generate_seed_payments(count=count)
-    
-    # Filter to comparable cases: insufficient_balance or card_declined
-    comparable_payments = [
-        p for p in payments 
-        if p.error_code in ["insufficient_balance", "card_declined", "wrong_otp"]
-    ]
-    if len(comparable_payments) < 10:
-        comparable_payments = payments
+import math
 
-    group_a_cases = []
-    group_b_cases = []
+def compute_wilson_ci(k: int, n: int, confidence: float = 0.95) -> tuple[float, float]:
+    """
+    Computes the Wilson score interval for a binomial proportion.
+    k: number of successes (recovered)
+    n: total attempts
+    confidence: 0.95 (z = 1.96)
+    """
+    if n <= 0:
+        return 0.0, 0.0
+    z = 1.96  # 95% confidence
+    p_hat = k / n
+    denominator = 1.0 + (z ** 2) / n
+    centre_adjusted_probability = (p_hat + (z ** 2) / (2.0 * n)) / denominator
+    margin = (z / denominator) * math.sqrt((p_hat * (1.0 - p_hat) / n) + ((z ** 2) / (4.0 * (n ** 2))))
+    lower = max(0.0, centre_adjusted_probability - margin)
+    upper = min(1.0, centre_adjusted_probability + margin)
+    return round(lower, 4), round(upper, 4)
 
-    # Deterministic alternating or hash split
-    for i, p in enumerate(comparable_payments):
+@router.post("/run-experiment", dependencies=[Depends(verify_demo_secret)])
+def run_experiment(count: int = Query(120)):
+    """
+    Simulated Holdout Experimentation Engine.
+    Draws directly from the already-seeded, already-diagnosed batch matching target causes
+    (insufficient_balance, wrong_otp, card_declined) to ensure consistency with the active dashboard.
+    Caps at min(count, available_matching_count) and returns transparent metadata.
+    """
+    # 1. Obtain pool from active batch or fallback
+    payments = results_cache.last_payments
+    diagnoses = results_cache.last_diagnoses
+
+    if not payments or not diagnoses:
+        # Fallback: if batch hasn't run yet or server restarted, seed a standard 210-payment batch
+        from seed.seed_data import generate_seed_payments
+        payments = generate_seed_payments(count=210)
+        diagnoses = {p.id: diagnosis_engine.diagnose(p) for p in payments}
+        results_cache.last_payments = payments
+        results_cache.last_diagnoses = diagnoses
+
+    # 2. Filter matching target causes: insufficient_balance, wrong_otp, card_declined
+    target_causes = ["insufficient_balance", "wrong_otp", "card_declined"]
+    matching_pairs = []
+    for p in payments:
+        diag = diagnoses.get(p.id) or diagnosis_engine.diagnose(p)
+        if diag.cause in target_causes:
+            matching_pairs.append((p, diag))
+
+    # If matching pool is unexpectedly small, include other customer-actionable causes
+    if len(matching_pairs) < 10:
+        for p in payments:
+            diag = diagnoses.get(p.id) or diagnosis_engine.diagnose(p)
+            if diag.cause == "expired_mandate":
+                matching_pairs.append((p, diag))
+
+    # 3. Take up to requested count (min(count, available_matching_count))
+    selected_count = min(count, len(matching_pairs)) if count > 0 else len(matching_pairs)
+    selected_pairs = matching_pairs[:selected_count]
+
+    group_a_pairs = []
+    group_b_pairs = []
+
+    # Deterministic alternating 50/50 split
+    for i, pair in enumerate(selected_pairs):
         if i % 2 == 0:
-            group_a_cases.append(p)
+            group_a_pairs.append(pair)
         else:
-            group_b_cases.append(p)
+            group_b_pairs.append(pair)
 
-    def evaluate_group(group_payments: List[FailedPayment], action_name: str, group_label: str):
-        attempts = len(group_payments)
+    def evaluate_group(group_pairs: List[Any], action_name: str, group_label: str):
+        attempts = len(group_pairs)
         recovered_count = 0
         recovered_paise = 0
         costs_paise = 0
         fatigue_paise = 0
 
-        for p in group_payments:
-            diag = diagnosis_engine.diagnose(p)
+        for p, diag in group_pairs:
             prior_cnt = 0
             
             c = get_action_cost(action_name, p.amount_paise)
@@ -679,6 +725,8 @@ def run_experiment(count: int = Query(100)):
 
         rate = round(recovered_count / attempts, 4) if attempts > 0 else 0.0
         net_val = recovered_paise - (costs_paise + fatigue_paise)
+        ci_lower, ci_upper = compute_wilson_ci(recovered_count, attempts)
+        ci_display = f"{rate * 100.0:.1f}% [{ci_lower * 100.0:.1f}%–{ci_upper * 100.0:.1f}%]"
 
         return {
             "group_label": group_label,
@@ -686,26 +734,50 @@ def run_experiment(count: int = Query(100)):
             "attempts": attempts,
             "recovered_count": recovered_count,
             "recovery_rate": rate,
+            "ci_lower": ci_lower,
+            "ci_upper": ci_upper,
+            "ci_display": ci_display,
             "recovered_paise": recovered_paise,
             "costs_paise": costs_paise + fatigue_paise,
             "net_value_paise": net_val
         }
 
-    group_a_results = evaluate_group(group_a_cases, "send_whatsapp_nudge", "Group A (WhatsApp Nudge)")
-    group_b_results = evaluate_group(group_b_cases, "suggest_alt_method", "Group B (Alt Payment Method)")
+    group_a_results = evaluate_group(group_a_pairs, "send_whatsapp_nudge", "Group A (WhatsApp Nudge)")
+    group_b_results = evaluate_group(group_b_pairs, "suggest_alt_method", "Group B (Alt Payment Method)")
 
-    winner = "Group A" if group_a_results["net_value_paise"] >= group_b_results["net_value_paise"] else "Group B"
+    # Check for confidence interval overlap
+    # Overlap occurs when max(lower_A, lower_B) <= min(upper_A, upper_B)
+    ci_a = (group_a_results["ci_lower"], group_a_results["ci_upper"])
+    ci_b = (group_b_results["ci_lower"], group_b_results["ci_upper"])
+    intervals_overlap = max(ci_a[0], ci_b[0]) <= min(ci_a[1], ci_b[1])
+
+    if intervals_overlap:
+        winner = "Inconclusive at this sample size"
+        is_inconclusive = True
+    else:
+        winner = "Group A" if group_a_results["net_value_paise"] >= group_b_results["net_value_paise"] else "Group B"
+        is_inconclusive = False
+
+    if len(selected_pairs) >= count:
+        cohort_explanation = f"Evaluated on full requested N={len(selected_pairs)} ({len(matching_pairs)} available matching cases in active batch)"
+    else:
+        cohort_explanation = f"Requested N={count}, evaluated on N={len(selected_pairs)} available matching cases in active batch"
 
     return {
-        "experiment_name": "Intervention Strategy A/B Trial",
-        "sample_size": len(comparable_payments),
-        "split_method": "Deterministic 50/50 Hash Split",
+        "experiment_name": "Simulated Holdout Experiment",
+        "sample_size": len(selected_pairs),
+        "requested_n": count,
+        "available_matching_count": len(matching_pairs),
+        "cohort_explanation": cohort_explanation,
+        "target_causes": target_causes,
+        "split_method": "Deterministic 50/50 Holdout Split",
         "winner": winner,
+        "is_inconclusive": is_inconclusive,
         "group_a": group_a_results,
         "group_b": group_b_results
     }
 
-@router.post("/trigger-adversarial-case")
+@router.post("/trigger-adversarial-case", dependencies=[Depends(verify_demo_secret)])
 async def trigger_adversarial_case():
     from seed.seed_data import generate_seed_payments
     all_adv = [p for p in generate_seed_payments() if p.id.startswith("pay_adv_")]
@@ -770,13 +842,13 @@ async def trigger_adversarial_case():
     await manager.broadcast_audit_entry(case_data)
     return {"status": "processed", "case": case_data}
 
-@router.post("/kill-switch")
+@router.post("/kill-switch", dependencies=[Depends(verify_demo_secret)])
 async def toggle_kill_switch(payload: KillSwitchPayload):
     kill_switch.set_active(payload.active)
     await manager.broadcast_kill_switch(payload.active)
     return {"kill_switch_active": kill_switch.is_active()}
 
-@router.post("/inject-failure")
+@router.post("/inject-failure", dependencies=[Depends(verify_demo_secret)])
 def inject_failure(payload: FailureInjectionPayload):
     t = payload.failure_type
     if t not in ["llm_timeout", "razorpay_error", "none"]:

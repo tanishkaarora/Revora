@@ -15,6 +15,8 @@ interface RecalibrationPair {
   total_observations: number;
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function RecalibrationPanel() {
   const [loading, setLoading] = useState<boolean>(false);
   const [result, setResult] = useState<{
@@ -26,8 +28,14 @@ export default function RecalibrationPanel() {
   const handleRecalibrate = async () => {
     try {
       setLoading(true);
-      const res = await fetch('http://localhost:8000/demo/recalibrate', {
-        method: 'POST'
+      const headers: Record<string, string> = {};
+      const demoSecret = process.env.NEXT_PUBLIC_DEMO_SECRET;
+      if (demoSecret) {
+        headers['X-Demo-Secret'] = demoSecret;
+      }
+      const res = await fetch(`${API_URL}/demo/recalibrate`, {
+        method: 'POST',
+        headers
       });
       if (res.ok) {
         const json = await res.json();

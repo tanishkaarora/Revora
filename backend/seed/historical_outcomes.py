@@ -107,7 +107,7 @@ def get_historical_evidence_aggregates(seed: int = 42) -> List[Dict[str, Any]]:
     Computes per-(cause, action) historical aggregate evidence statistics.
     Returns: list of dicts with cause, action, attempts, recovered, recovery_rate, ci_lower, ci_upper.
     """
-    data = generate_historical_outcomes(sample_size=1800, seed=seed)
+    data = generate_historical_outcomes(sample_size=1500, seed=seed)
     stats: Dict[Tuple[str, str], Dict[str, int]] = {}
 
     for row in data:

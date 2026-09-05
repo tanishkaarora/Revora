@@ -2,7 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useAppStore } from './store';
 
-const WEBSOCKET_URL = 'ws://localhost:8000/ws/stream';
+const WEBSOCKET_URL = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000/ws/stream';
 
 export function useWebSocketConnection() {
   const socketRef = useRef<WebSocket | null>(null);
@@ -14,6 +14,7 @@ export function useWebSocketConnection() {
   const addAuditEntry = useAppStore((state) => state.addAuditEntry);
   const fetchResults = useAppStore((state) => state.fetchResults);
   const setComparison = useAppStore((state) => state.setComparison);
+  const setEngineStatus = useAppStore((state) => state.setEngineStatus);
 
   useEffect(() => {
     let reconnectTimeoutId: any;
@@ -25,6 +26,7 @@ export function useWebSocketConnection() {
 
       ws.onopen = () => {
         console.log('WebSocket connected successfully');
+        setEngineStatus('connected');
       };
 
       ws.onmessage = (event) => {
@@ -71,6 +73,7 @@ export function useWebSocketConnection() {
 
       ws.onclose = () => {
         console.log('WebSocket closed. Attempting reconnect in 3s...');
+        setEngineStatus('offline');
         reconnectTimeoutId = setTimeout(() => {
           connect();
         }, 3000);
@@ -78,6 +81,7 @@ export function useWebSocketConnection() {
 
       ws.onerror = (error) => {
         console.error('WebSocket connection error:', error);
+        setEngineStatus('offline');
         ws.close();
       };
     }
@@ -92,7 +96,7 @@ export function useWebSocketConnection() {
         clearTimeout(reconnectTimeoutId);
       }
     };
-  }, [updateCase, setKillSwitchActive, setSimulationRunning, setLiveStage, addAuditEntry, fetchResults, setComparison]);
+  }, [updateCase, setKillSwitchActive, setSimulationRunning, setLiveStage, addAuditEntry, fetchResults, setComparison, setEngineStatus]);
 
   return socketRef.current;
 }

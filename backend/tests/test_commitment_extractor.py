@@ -62,3 +62,37 @@ def test_commitment_extractor_fallback_hinglish_friday():
     res3 = extractor.extract_commitment("pay_test_003", "parso kar dunga")
     assert res3.commits is True
     assert res3.promised_date is not None
+
+
+def test_promise_tracker_fallback_tomorrow_date(tmp_path):
+    from datetime import datetime, timedelta
+    from unittest.mock import MagicMock
+    from app.audit.store import AuditStore
+    from app.revora.execution.promise_tracker import PromiseTracker
+    from app.guardrail.types import Commitment
+
+    db_path = str(tmp_path / "test_recovery.db")
+    store = AuditStore(db_path=db_path)
+    tracker = PromiseTracker(store)
+
+    # Mock extractor to simulate positive commitment with no specific date parsed
+    tracker.extractor.extract_commitment = MagicMock(
+        return_value=Commitment(
+            failed_payment_id="pay_test_no_date",
+            commits=True,
+            promised_date=None,
+            confidence=0.8,
+            raw_reply="haan zaroor pay kar dunga"
+        )
+    )
+
+    commitment = tracker.process_reply("pay_test_no_date", "cust_test_001", "haan zaroor pay kar dunga")
+    assert commitment.commits is True
+    
+    # Check that promise was stored with tomorrow's date
+    active_promise = store.get_active_promise("cust_test_001")
+    assert active_promise is not None
+    expected_tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    assert active_promise["promised_date"] == expected_tomorrow
+    assert active_promise["status"] == "pending"
+

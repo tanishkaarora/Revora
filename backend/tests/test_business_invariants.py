@@ -106,7 +106,7 @@ def test_promise_invariant_full_batch(clean_store):
         # Force candidate action to outreach to test guardrail blocking
         dec.candidate_action = "send_whatsapp_nudge"
         dec.allocated = True
-        guard_dec = policy_engine.evaluate(p, dec)
+        guard_dec = policy_engine.evaluate(p, dec, current_time_str="12:00")
 
         assert guard_dec.outcome == "BLOCK", f"Promise invariant violated for {p.customer_id}: allowed outreach!"
         assert guard_dec.rule_fired == "promise_pending"

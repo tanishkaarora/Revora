@@ -12,6 +12,8 @@ interface HistoricalRecord {
   ci_upper: number;
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
 export default function HistoricalEvidence() {
   const [data, setData] = useState<HistoricalRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -21,7 +23,7 @@ export default function HistoricalEvidence() {
     async function loadEvidence() {
       try {
         setLoading(true);
-        const res = await fetch('http://localhost:8000/results/historical-evidence');
+        const res = await fetch(`${API_URL}/results/historical-evidence`);
         if (res.ok) {
           const json = await res.json();
           setData(json.aggregates || []);
@@ -54,7 +56,7 @@ export default function HistoricalEvidence() {
             </span>
           </div>
           <p className="text-xs text-gray-400">
-            Per-action, per-cause empirical statistics from N=1,800 synthetic historical attempts with 95% Wilson Score confidence intervals.
+            Per-action, per-cause empirical statistics from N=1,500 synthetic historical attempts with 95% Wilson Score confidence intervals.
           </p>
         </div>
 

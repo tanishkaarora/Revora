@@ -245,7 +245,7 @@ export default function LandingPage() {
                   </div>
                 </div>
                 <p className="text-xs text-content-secondary leading-relaxed">
-                  Ranks by Expected Value (EV). Solves a linear program to focus budget on high-yield recoveries with zero policy violations.
+                  Ranks by Expected Value (EV). Solves a Mixed-Integer Linear Program (MILP) to focus budget on high-yield recoveries with zero policy violations.
                 </p>
               </div>
             </div>
@@ -286,7 +286,7 @@ export default function LandingPage() {
             <div>
               <h4 className="text-xs font-bold text-content-primary uppercase tracking-wider mb-1">2. Triage & Optimize</h4>
               <p className="text-xs text-content-secondary leading-relaxed">
-                Calculates Expected Net Value and solves linear programs under strict channel quotas.
+                Calculates Expected Net Value and solves MILP optimization under strict channel quotas.
               </p>
             </div>
           </div>

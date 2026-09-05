@@ -29,13 +29,19 @@ app = FastAPI(
     version="2.0.0"
 )
 
-# Explicit CORS configuration for split-stack local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Explicit CORS configuration for split-stack local and production deployments
+frontend_origin_env = os.environ.get("FRONTEND_ORIGIN")
+if frontend_origin_env:
+    origins = [origin.strip() for origin in frontend_origin_env.split(",") if origin.strip()]
+else:
+    origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -79,4 +85,5 @@ async def websocket_stream_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)

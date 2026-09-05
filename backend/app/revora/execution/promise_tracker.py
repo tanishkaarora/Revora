@@ -1,7 +1,7 @@
 # backend/app/revora/execution/promise_tracker.py
 
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from app.audit.store import AuditStore
 from app.revora.execution.commitment_extractor import CommitmentExtractor
@@ -27,7 +27,7 @@ class PromiseTracker:
             # Default to tomorrow if date is not parsed
             promised_date = commitment.promised_date
             if not promised_date:
-                promised_date = datetime.now().strftime("%Y-%m-%d")
+                promised_date = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
                 
             self.store.create_or_update_promise(
                 failed_payment_id=failed_payment_id,

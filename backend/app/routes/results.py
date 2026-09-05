@@ -24,7 +24,7 @@ def get_historical_evidence():
     return {
         "dataset_type": "Synthetic Demo Data",
         "badge_label": "Synthetic Demo Data",
-        "description": "Historical recovery rates calibrated on labeled demo outcomes (N=1,800)",
+        "description": "Historical recovery rates calibrated on labeled demo outcomes (N=1,500)",
         "aggregates": aggregates
     }
 

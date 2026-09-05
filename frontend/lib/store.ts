@@ -106,6 +106,8 @@ interface AppState {
   selectedTab: string;
   promises: any[];
   liveStage: LiveStage | null;
+  engineStatus: 'connected' | 'degraded' | 'offline';
+  seedBatchError: string | null;
   
   // Actions
   setCases: (cases: CaseData[]) => void;
@@ -118,6 +120,8 @@ interface AppState {
   setLiveStage: (stage: LiveStage | null) => void;
   addAuditEntry: (entry: AuditLog) => void;
   setSelectedTab: (tab: string) => void;
+  setEngineStatus: (status: 'connected' | 'degraded' | 'offline') => void;
+  setSeedBatchError: (err: string | null) => void;
   
   // API Fetch Thunks
   fetchCases: () => Promise<void>;
@@ -127,12 +131,12 @@ interface AppState {
   fetchPromises: () => Promise<void>;
   toggleKillSwitch: (active: boolean) => Promise<void>;
   seedBatch: (limit?: number) => Promise<void>;
-  triggerAdversarial: () => Promise<void>;
+  triggerAdversarial: () => Promise<CaseData | null>;
   injectFailure: (type: 'llm_timeout' | 'razorpay_error' | 'none') => Promise<void>;
   simulateReply: (caseId: string, text: string) => Promise<void>;
 }
 
-const BACKEND_URL = 'http://localhost:8000';
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
 export const useAppStore = create<AppState>((set, get) => ({
   cases: [],
@@ -155,6 +159,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   auditEntries: [],
   selectedTab: 'overview',
   liveStage: null,
+  engineStatus: 'connected',
+  seedBatchError: null,
 
   setCases: (cases) => set({ cases }),
   
@@ -181,15 +187,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedTab: (selectedTab) => set({ selectedTab, activeCaseId: null }),
 
 
+  setEngineStatus: (engineStatus) => set({ engineStatus }),
+  setSeedBatchError: (seedBatchError) => set({ seedBatchError }),
+
   fetchCases: async () => {
     try {
       const response = await fetch(`${BACKEND_URL}/cases`);
       if (response.ok) {
         const data = await response.json();
-        set({ cases: data });
+        set({ cases: data, engineStatus: 'connected' });
+      } else {
+        set({ engineStatus: 'degraded' });
       }
     } catch (error) {
       console.error('Failed to fetch cases:', error);
+      set({ engineStatus: 'offline' });
     }
   },
 
@@ -237,9 +249,14 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleKillSwitch: async (active) => {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const demoSecret = process.env.NEXT_PUBLIC_DEMO_SECRET;
+      if (demoSecret) {
+        headers['X-Demo-Secret'] = demoSecret;
+      }
       const response = await fetch(`${BACKEND_URL}/demo/kill-switch`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ active })
       });
       if (response.ok) {
@@ -255,40 +272,75 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ 
         simulationRunning: true, 
+        seedBatchError: null,
         cases: [], 
         auditEntries: [],
         liveStage: { stage: 'Ingesting', progress: 10, description: 'Starting live decision pipeline replay...' }
       });
+      const headers: Record<string, string> = {};
+      const demoSecret = process.env.NEXT_PUBLIC_DEMO_SECRET;
+      if (demoSecret) {
+        headers['X-Demo-Secret'] = demoSecret;
+      }
       const response = await fetch(`${BACKEND_URL}/demo/seed-batch?limit=${limit}`, {
-        method: 'POST'
+        method: 'POST',
+        headers
       });
       if (!response.ok) {
-        set({ simulationRunning: false, liveStage: null });
+        const errorText = await response.text();
+        set({ 
+          simulationRunning: false, 
+          liveStage: null, 
+          seedBatchError: `Failed to execute recovery batch (${response.status}): ${errorText || 'Server error'}`
+        });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to seed batch:', error);
-      set({ simulationRunning: false, liveStage: null });
+      set({ 
+        simulationRunning: false, 
+        liveStage: null, 
+        seedBatchError: `Unable to connect to Revora recovery engine: ${error?.message || 'Network unreachable'}`
+      });
     }
   },
 
   triggerAdversarial: async () => {
     try {
+      const headers: Record<string, string> = {};
+      const demoSecret = process.env.NEXT_PUBLIC_DEMO_SECRET;
+      if (demoSecret) {
+        headers['X-Demo-Secret'] = demoSecret;
+      }
       const response = await fetch(`${BACKEND_URL}/demo/trigger-adversarial-case`, {
-        method: 'POST'
+        method: 'POST',
+        headers
       });
       if (response.ok) {
+        const data = await response.json();
+        if (data.case) {
+          get().updateCase(data.case);
+          get().setActiveCaseId(data.case.id);
+          return data.case;
+        }
         await get().fetchCases();
       }
+      return null;
     } catch (error) {
       console.error('Failed to trigger adversarial case:', error);
+      return null;
     }
   },
 
   injectFailure: async (type) => {
     try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      const demoSecret = process.env.NEXT_PUBLIC_DEMO_SECRET;
+      if (demoSecret) {
+        headers['X-Demo-Secret'] = demoSecret;
+      }
       await fetch(`${BACKEND_URL}/demo/inject-failure`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ failure_type: type })
       });
     } catch (error) {

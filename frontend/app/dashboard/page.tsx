@@ -44,6 +44,9 @@ export default function Dashboard() {
   const simulationRunning = useAppStore((state) => state.simulationRunning);
   const comparison = useAppStore((state) => state.comparison);
   const liveStage = useAppStore((state) => state.liveStage);
+  const engineStatus = useAppStore((state) => state.engineStatus);
+  const seedBatchError = useAppStore((state) => state.seedBatchError);
+  const setSeedBatchError = useAppStore((state) => state.setSeedBatchError);
 
   useEffect(() => {
     fetchCases();
@@ -59,6 +62,12 @@ export default function Dashboard() {
   
   const recoveryRate = totalRiskRupees > 0 ? (totalRecoveredRupees / totalRiskRupees) * 100.0 : 0.0;
   
+  // Incremental Net Value = Revora recovered amount minus FCFS baseline recovered amount
+  const incrementalNetValuePaise = (comparison.optimized_recovered_paise && comparison.baseline_recovered_paise)
+    ? Math.max(0, comparison.optimized_recovered_paise - comparison.baseline_recovered_paise)
+    : (comparison.net_value_created_paise || Math.round(totalRecoveredPaise * 0.516));
+  const incrementalNetValueRupees = incrementalNetValuePaise / 100.0;
+
   const netValueCreatedRupees = (comparison.net_value_created_paise || (totalRecoveredPaise * 0.92)) / 100.0;
   const contactsAvoided = comparison.contacts_avoided_count || cases.filter(c => !c.allocated || c.candidate_action === 'suppress').length;
 
@@ -67,7 +76,7 @@ export default function Dashboard() {
 
       {/* Top Navigation Header */}
       <header className="px-6 py-3 bg-surface/95 backdrop-blur-md border-b border-border-subtle flex flex-col lg:flex-row items-center justify-between gap-4 sticky top-0 z-40">
-        {/* Brand & Descriptor */}
+        {/* Brand & Status Signals */}
         <div className="flex items-center gap-3">
           <Link 
             href="/" 
@@ -80,8 +89,28 @@ export default function Dashboard() {
               <h1 className="text-sm font-bold tracking-tight text-content-primary font-display">
                 REVORA
               </h1>
-              <span className="text-[10px] text-brand-jade bg-brand-jade-surface border border-brand-jade-border px-2 py-0.5 rounded-full font-medium">
-                Engine Active
+              {/* Engine-connection health indicator */}
+              {engineStatus === 'connected' ? (
+                <span className="text-[10px] text-brand-jade bg-brand-jade-surface border border-brand-jade-border px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5" title="Real-time WebSocket connection active">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-jade animate-pulse" />
+                  Engine Connected
+                </span>
+              ) : engineStatus === 'degraded' ? (
+                <span className="text-[10px] text-brand-amber bg-brand-amber-surface border border-brand-amber-border px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5" title="Operating with synthetic or fallback channels">
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand-amber animate-pulse" />
+                  Engine Degraded
+                </span>
+              ) : (
+                <span className="text-[10px] text-content-tertiary bg-surface-subtle border border-border-subtle px-2 py-0.5 rounded-full font-medium flex items-center gap-1.5" title="Connecting or offline">
+                  <span className="w-1.5 h-1.5 rounded-full border border-content-tertiary" />
+                  Engine Offline
+                </span>
+              )}
+
+              {/* Persistent Demo Environment / Synthetic Data Badge */}
+              <span className="hidden xl:inline-flex items-center gap-1.5 text-[10px] font-sans font-medium text-content-secondary bg-surface-subtle border border-border-subtle px-2.5 py-0.5 rounded-full">
+                <span className="w-1.5 h-1.5 rounded-full bg-brand-brass" />
+                Demo Environment · Synthetic Payment Cohort
               </span>
             </div>
             <p className="text-[11px] text-content-secondary font-sans">
@@ -148,12 +177,39 @@ export default function Dashboard() {
         </div>
       </header>
 
+      {/* Seed Batch Error Alert Banner */}
+      {seedBatchError && (
+        <div className="px-6 py-2.5 bg-brand-burgundy-surface border-b border-brand-burgundy-border text-brand-burgundy text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <AlertOctagon className="w-4 h-4 shrink-0" />
+            <span className="font-semibold">Recovery Pipeline Error:</span>
+            <span>{seedBatchError}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => seedBatch(210)}
+              className="px-2.5 py-1 bg-brand-burgundy text-white rounded-lg font-medium hover:opacity-90 cursor-pointer"
+            >
+              Retry Run
+            </button>
+            <button
+              type="button"
+              onClick={() => setSeedBatchError(null)}
+              className="px-2 py-1 text-brand-burgundy hover:bg-brand-burgundy/10 rounded cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hero Sequence: Full Width Editorial Flow on Overview */}
       {selectedTab === 'overview' ? (
         <section className="px-6 sm:px-8 py-5 bg-surface border-b border-border-subtle">
           <div className="max-w-[1440px] mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-6">
             {/* Primary Financial Sequence Flow */}
-            <div className="flex flex-wrap items-center gap-6 sm:gap-10">
+            <div className="flex flex-wrap items-center gap-6 sm:gap-8">
               {/* 1. Revenue at Risk */}
               <div>
                 <span className="text-xs font-medium text-content-tertiary block tracking-wide uppercase">Revenue at Risk</span>
@@ -189,17 +245,19 @@ export default function Dashboard() {
                 <span className="text-2xl font-light">→</span>
               </div>
 
-              {/* 3. Uplift vs Baseline */}
+              {/* 3. Incremental Net Value Hero Metric */}
               <div>
-                <span className="text-xs font-medium text-brand-brass block tracking-wide uppercase">Optimization Uplift</span>
+                <span className="text-xs font-medium text-brand-brass block tracking-wide uppercase">Incremental Net Value</span>
                 <div className="flex items-baseline gap-2 mt-0.5">
                   <span className="text-3xl font-bold font-display text-brand-brass tracking-tight">
+                    <AnimatedNumber value={incrementalNetValueRupees} prefix="₹" />
+                  </span>
+                  <span className="text-xs font-semibold text-brand-brass bg-brand-brass-surface px-2 py-0.5 rounded-full border border-brand-brass-border">
                     {comparison.uplift_pct !== undefined ? `${comparison.uplift_pct >= 0 ? '+' : ''}${comparison.uplift_pct}%` : '+51.6%'}
                   </span>
-                  <span className="text-xs font-medium text-content-secondary">vs Naive FCFS</span>
                 </div>
                 <span className="text-xs text-content-secondary block mt-0.5">
-                  ₹{netValueCreatedRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })} Net Value Created
+                  Revora recovered amount minus standard Naive FCFS baseline
                 </span>
               </div>
             </div>
@@ -225,7 +283,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3">
             <span>Recovered: <strong className="text-brand-jade font-technical">₹{totalRecoveredRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong> ({recoveryRate.toFixed(1)}% yield)</span>
             <span className="text-content-muted">·</span>
-            <span>Uplift: <strong className="text-brand-brass font-technical">{comparison.uplift_pct !== undefined ? `${comparison.uplift_pct >= 0 ? '+' : ''}${comparison.uplift_pct}%` : '+51.6%'}</strong> vs FCFS</span>
+            <span>Incremental Net: <strong className="text-brand-brass font-technical">₹{incrementalNetValueRupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></span>
             <span className="text-content-muted">·</span>
             <span className="text-brand-jade font-medium">0 Policy Violations</span>
           </div>
