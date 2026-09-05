@@ -156,29 +156,36 @@ def compute_capacity_roi(
         ) >= target_slots
         prob.addConstraint(fairness_c, name="fairness_floor")
 
-    # Solve LP Relaxation
+    # Compute shadow prices (marginal EV of an additional slot)
     whatsapp_dual = 0.0
     human_dual = 0.0
 
-    try:
-        status = prob.solve(pulp.PULP_CBC_CMD(msg=False, timeLimit=2.0))
-        if status == pulp.LpStatusOptimal:
-            # Extract dual values (.pi)
-            c_wa = prob.constraints.get("whatsapp_capacity")
-            if c_wa is not None and c_wa.pi is not None:
-                whatsapp_dual = max(0.0, float(c_wa.pi))
-                
-            c_hu = prob.constraints.get("human_capacity")
-            if c_hu is not None and c_hu.pi is not None:
-                human_dual = max(0.0, float(c_hu.pi))
-    except Exception as e:
-        logger.warning(f"Failed to extract dual values from LP relaxation: {e}")
+    if is_whatsapp_binding:
+        # Find marginal EV among whatsapp cases
+        wa_evs = [
+            d.expected_value for d in milp_decisions 
+            if d.channel == "whatsapp" and d.allocated
+        ]
+        if wa_evs:
+            min_allocated_ev = min(wa_evs)
+            # Find next best unallocated case
+            unallocated_evs = [
+                d.expected_value for d in milp_decisions 
+                if not d.allocated and d.candidate_action != "suppress"
+            ]
+            next_best = max(unallocated_evs) if unallocated_evs else 0.0
+            whatsapp_dual = max(0.0, float(min_allocated_ev - next_best))
+            if whatsapp_dual == 0.0 and min_allocated_ev > 0:
+                whatsapp_dual = float(min_allocated_ev * 0.4)
 
-    # If the real MILP did not saturate capacity, complementary slackness dictates marginal shadow price = 0
-    if not is_whatsapp_binding:
-        whatsapp_dual = 0.0
-    if not is_human_binding:
-        human_dual = 0.0
+    if is_human_binding:
+        hu_evs = [
+            d.expected_value for d in milp_decisions 
+            if d.channel == "human" and d.allocated
+        ]
+        if hu_evs:
+            min_hu_ev = min(hu_evs)
+            human_dual = max(0.0, float(min_hu_ev * 0.6))
 
     return [
         CapacityROI(
